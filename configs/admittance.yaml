@@ -1,24 +1,47 @@
 schema_version: 1
 
 admittance:
-  # First version keeps mass and stiffness fixed; values must be identified
-  # and approved before a controller is implemented.
+  # Simulation-only baseline values. These are not approved hardware values.
+  sample_time_s: 0.002
   mass:
-    x: TODO_CONFIGURE
-    y: TODO_CONFIGURE
-    theta: TODO_CONFIGURE
+    x: 0.35             # kg
+    y: 0.35             # kg
+    theta: 0.03         # kg*m^2
   damping:
-    x: TODO_CONFIGURE
-    y: TODO_CONFIGURE
-    theta: TODO_CONFIGURE
+    x: 3.0              # N*s/m
+    y: 3.0              # N*s/m
+    theta: 0.25         # N*m*s/rad
   stiffness:
-    x: TODO_CONFIGURE
-    y: TODO_CONFIGURE
-    theta: TODO_CONFIGURE
-  assist_gain: TODO_CONFIGURE
-  velocity_scale: TODO_CONFIGURE
+    x: 8.0              # N/m
+    y: 8.0              # N/m
+    theta: 0.8          # N*m/rad
+  assist_gain: 0.0      # Fixed baseline has no patient-specific assistance.
+  assist_damping: 0.0
+  velocity_scale: 1.0
+  velocity_limits:
+    x: 0.20             # m/s
+    y: 0.20             # m/s
+    theta: 0.80         # rad/s
+  acceleration_limits:
+    x: 0.80             # m/s^2
+    y: 0.80             # m/s^2
+    theta: 3.0          # rad/s^2
+
+force_processing:
+  low_pass_time_constant_s:
+    x: 0.02
+    y: 0.02
+    theta: 0.02
+  soft_deadzone:
+    x: 0.15             # N
+    y: 0.15             # N
+    theta: 0.02         # N*m
+
+baseline:
+  simulation_only: true
+  parameter_source: virtual_simulation_placeholder
+  hardware_validation_required: true
 
 update_policy:
   rl_update_hz: TODO_CONFIGURE
   max_parameter_delta_per_update: TODO_CONFIGURE
-

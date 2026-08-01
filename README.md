@@ -2,7 +2,7 @@
 
 基于安全强化学习与交互 Agent 的平面三自由度上肢康复机器人自适应导纳训练系统。
 
-当前仓库已完成 **Phase 0：仓库初始化** 和 **Phase 1：MuJoCo 三自由度机器人**。当前只实现数字孪生、运动学、末端外力注入、模型限位和可视化；导纳控制、虚拟患者、Gymnasium 环境、强化学习、页面、Agent 与 ROS2 业务逻辑仍按后续 Phase 顺序实现。
+当前仓库已完成 **Phase 0：仓库初始化**、**Phase 1：MuJoCo 三自由度机器人** 和 **Phase 2：固定参数导纳控制**。当前只实现数字孪生、运动学、末端外力注入、模型限位、可视化和固定参数导纳基线；虚拟患者、Gymnasium 环境、强化学习、页面、Agent 与 ROS2 业务逻辑仍按后续 Phase 顺序实现。
 
 ## 环境
 
@@ -62,6 +62,41 @@ python3 -m scripts.run_phase1_sim --headless --steps 1000 --wrench 0.5 -0.2 0.1
 ```
 
 Phase 1 的位置执行器和外力接口仅用于数字孪生验证，不是导纳控制器，也不允许 RL 直接替代底层伺服输出。
+
+## Phase 2：固定参数导纳控制
+
+控制器位于 `rehab_sim/controllers/admittance_controller.py`，实现对角三自由度模型：
+
+```text
+M * ddX + D * dX + K * (X - Xr) = F_effective + F_assist
+```
+
+已实现：
+
+- 一阶力信号低通滤波；
+- 软死区；
+- 速度和加速度限幅；
+- 任务空间工作空间裁剪；
+- 固定参数的按需辅助项接口；
+- 与 Phase 1 MuJoCo 模型连接的阻尼最小二乘 IK 目标映射。
+
+仿真基线参数位于 `configs/admittance.yaml`，明确标记为仿真占位值，不能直接用于真实机器人。
+
+运行三类基线实验：
+
+```bash
+python3 -m scripts.run_phase2_baseline --experiment step --duration 3
+python3 -m scripts.run_phase2_baseline --experiment sine --duration 3
+python3 -m scripts.run_phase2_baseline --experiment reverse --duration 3
+```
+
+结果默认写入 `experiments/reports/phase2_baseline/`：
+
+- `*_baseline.csv`：力、期望/实际位姿、速度、加速度和关节目标；
+- `*_baseline.svg`：力、速度和位置曲线；
+- `*_baseline.json`：样本数、峰值速度、峰值力和漂移摘要。
+
+Phase 2 不包含虚拟患者、RL 策略、随机探索、安全策略部署或 Agent。
 
 ## 项目规范
 

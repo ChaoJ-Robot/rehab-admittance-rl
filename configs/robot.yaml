@@ -35,6 +35,15 @@ simulation:
   gravity_m_per_s2: [0.0, 0.0, -9.81]
   contact_geometry_enabled: false
 
+# Broad simulation envelope for Phase 2 tests only. Real workspace limits
+# must be measured and approved before hardware deployment.
+workspace:
+  x: [-1.0, 1.0]
+  y: [-1.0, 1.0]
+  theta: [-3.14159265, 3.14159265]
+  source: simulation_envelope_placeholder
+  hardware_validation_required: true
+
 coordinate_system:
   task_frame: TODO_CONFIGURE
   base_frame: TODO_CONFIGURE

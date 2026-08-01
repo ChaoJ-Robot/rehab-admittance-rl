@@ -76,6 +76,12 @@ class MujocoPlanarRobot:
         return np.array([position[0], position[1], theta], dtype=np.float64)
 
     @property
+    def end_effector_velocity(self) -> FloatArray:
+        """Current task velocity ``[vx, vy, omega]`` in SI units."""
+
+        return self.geometry.jacobian(self.qpos) @ self.qvel
+
+    @property
     def external_wrench(self) -> FloatArray:
         """Configured interaction wrench ``[Fx, Fy, Tz]`` in N, N, N*m."""
 

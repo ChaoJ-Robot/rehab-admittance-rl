@@ -51,6 +51,28 @@ class WorkspaceBounds:
     y: tuple[float, float]
     theta: tuple[float, float]
 
+    @classmethod
+    def from_config(cls, config: Mapping[str, Any]) -> WorkspaceBounds:
+        """Build workspace bounds from the ``workspace`` YAML section."""
+
+        raw = config.get("workspace")
+        if not isinstance(raw, Mapping):
+            raise ValueError("robot configuration must contain a workspace mapping")
+        try:
+
+            def pair(name: str) -> tuple[float, float]:
+                items = raw[name]
+                if not isinstance(items, (list, tuple)) or len(items) != 2:
+                    raise ValueError(name)
+                return float(items[0]), float(items[1])
+
+            values = (pair("x"), pair("y"), pair("theta"))
+        except (KeyError, TypeError, ValueError) as error:
+            raise ValueError("workspace must define numeric x, y and theta pairs") from error
+        if any(pair[0] > pair[1] for pair in values):
+            raise ValueError("workspace bounds must be ordered two-element pairs")
+        return cls(x=values[0], y=values[1], theta=values[2])
+
     def contains(self, pose: ArrayLike) -> bool:
         """Return whether ``pose=[x,y,theta]`` is inside all configured bounds."""
 
@@ -60,6 +82,14 @@ class WorkspaceBounds:
             and self.y[0] <= value[1] <= self.y[1]
             and self.theta[0] <= value[2] <= self.theta[1]
         )
+
+    def clip(self, pose: ArrayLike) -> FloatArray:
+        """Clip a task pose to the configured axis-aligned bounds."""
+
+        value = _vector(pose, 3, "pose")
+        lower = np.array([self.x[0], self.y[0], self.theta[0]], dtype=np.float64)
+        upper = np.array([self.x[1], self.y[1], self.theta[1]], dtype=np.float64)
+        return np.clip(value, lower, upper)
 
 
 @dataclass(frozen=True)
