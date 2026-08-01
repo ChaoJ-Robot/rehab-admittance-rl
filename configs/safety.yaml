@@ -14,3 +14,12 @@ safety:
   policy_timeout_ms: TODO_CONFIGURE
   fallback_parameters: TODO_CONFIGURE
 
+# Simulation termination thresholds used by Phase 4. These are not hardware
+# safety limits and must be replaced before real-robot work.
+simulation_limits:
+  interaction_force_norm: 5.0
+  task_speed_norm: 0.50
+  task_acceleration_norm: 3.0
+  stagnation_seconds: 10.0
+  source: simulation_placeholder
+  hardware_validation_required: true

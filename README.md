@@ -2,7 +2,7 @@
 
 基于安全强化学习与交互 Agent 的平面三自由度上肢康复机器人自适应导纳训练系统。
 
-当前仓库已完成 **Phase 0：仓库初始化**、**Phase 1：MuJoCo 三自由度机器人**、**Phase 2：固定参数导纳控制** 和 **Phase 3：虚拟患者**。当前只实现数字孪生、运动学、末端外力注入、模型限位、可视化、固定参数导纳基线和参数化患者力生成；Gymnasium 环境、强化学习、页面、Agent 与 ROS2 业务逻辑仍按后续 Phase 顺序实现。
+当前仓库已完成 **Phase 0：仓库初始化**、**Phase 1：MuJoCo 三自由度机器人**、**Phase 2：固定参数导纳控制**、**Phase 3：虚拟患者** 和 **Phase 4：Gymnasium 训练环境**。强化学习训练、部署安全层、页面、Agent 与 ROS2 业务逻辑仍按后续 Phase 顺序实现。
 
 ## 环境
 
@@ -123,6 +123,26 @@ python3 -m scripts.run_phase3_patient_demo --duration 8 --sample-time 0.01
 ```
 
 结果默认写入 `experiments/reports/phase3_patients/`，每个患者配置包含 CSV 力/状态数据和 SVG 曲线。该脚本是开环患者力生成演示，不是 Gymnasium 环境，也不直接控制机器人。
+
+## Phase 4：Gymnasium 训练环境
+
+环境位于 `rehab_sim/envs/`，提供 `PointReachEnv`、`CircleTrackingEnv` 和 `Figure8TrackingEnv` 三类连续控制任务。动作是低频的导纳参数增量 `[damping_xy, damping_theta, assist_gain, velocity_scale]`，不是关节力矩；观测包含关节状态、末端状态、患者交互力、参考轨迹、跟踪误差、当前导纳参数、任务进度和仿真安全状态。
+
+奖励由进度、归一化跟踪误差、过大交互力、运动突变、辅助能量、参数变化、患者主动功率、任务成功和不安全终止等分项组成，并通过 `info["reward_components"]` 独立记录。环境支持 Gymnasium `reset/step` 接口、有限时域、成功终止和仿真异常终止。
+
+运行 Gymnasium/SB3 检查及短随机策略验证：
+
+```bash
+python3 -m scripts.check_phase4_envs
+```
+
+Phase 4 的集成测试还覆盖 SB3 `check_env`、三个任务的随机策略有限步运行、无 NaN 和固定种子可重复性：
+
+```bash
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q
+```
+
+该阶段只提供环境和固定控制器基线接口，不包含 SAC 训练脚本或真实机器人安全部署。
 
 ## 项目规范
 

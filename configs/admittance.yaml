@@ -37,6 +37,21 @@ force_processing:
     y: 0.15             # N
     theta: 0.02         # N*m
 
+adaptive_update:
+  # Normalized action increments used by the Phase 4 environment. Safety
+  # projection and fault fallback are deliberately implemented in Phase 6.
+  action_scales:
+    damping_xy: 0.25
+    damping_theta: 0.02
+    assist_gain: 0.50
+    velocity_scale: 0.05
+  parameter_bounds:
+    damping_x: [1.0, 10.0]
+    damping_y: [1.0, 10.0]
+    damping_theta: [0.05, 1.0]
+    assist_gain: [0.0, 5.0]
+    velocity_scale: [0.5, 1.5]
+
 baseline:
   simulation_only: true
   parameter_source: virtual_simulation_placeholder

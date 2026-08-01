@@ -2,18 +2,17 @@ schema_version: 1
 
 tasks:
   point_to_point:
-    target_distance: TODO_CONFIGURE
-    target_radius: TODO_CONFIGURE
-    reference_speed: TODO_CONFIGURE
-    task_duration: TODO_CONFIGURE
+    target_distance: 0.15       # m, simulation placeholder
+    target_radius: 0.025        # m
+    reference_speed: 0.05       # m/s
+    task_duration: 4.0          # s
   circle_tracking:
-    path_radius: TODO_CONFIGURE
-    reference_speed: TODO_CONFIGURE
-    path_width: TODO_CONFIGURE
-    task_duration: TODO_CONFIGURE
+    path_radius: 0.08           # m, simulation placeholder
+    reference_speed: 0.10       # m/s
+    path_width: 0.025           # m
+    task_duration: 8.0          # s
   figure8_tracking:
-    path_width: TODO_CONFIGURE
-    reference_speed: TODO_CONFIGURE
-    path_width_tolerance: TODO_CONFIGURE
-    task_duration: TODO_CONFIGURE
-
+    path_width: 0.12            # m, simulation placeholder
+    reference_speed: 0.10       # m/s
+    path_width_tolerance: 0.03  # m
+    task_duration: 8.0          # s
