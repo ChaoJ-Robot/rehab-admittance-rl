@@ -17,6 +17,7 @@ def test_phase_zero_templates_load_as_mappings() -> None:
         "rl_sac",
         "agent",
         "ros2",
+        "phase10",
     }
     assert all(isinstance(value, dict) for value in bundle.values())
 

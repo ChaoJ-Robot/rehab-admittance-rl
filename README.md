@@ -2,7 +2,7 @@
 
 基于安全强化学习与交互 Agent 的平面三自由度上肢康复机器人自适应导纳训练系统。
 
-当前仓库已完成 **Phase 0：仓库初始化**、**Phase 1：MuJoCo 三自由度机器人**、**Phase 2：固定参数导纳控制**、**Phase 3：虚拟患者**、**Phase 4：Gymnasium 训练环境**、**Phase 5：SAC 训练**、**Phase 6：安全策略部署层**、**Phase 7：交互页面**、**Phase 8：交互 Agent** 和 **Phase 9：ROS2 接口**。Phase 10 实验包装仍按后续 Phase 顺序实现。
+当前仓库已完成 **Phase 0：仓库初始化**、**Phase 1：MuJoCo 三自由度机器人**、**Phase 2：固定参数导纳控制**、**Phase 3：虚拟患者**、**Phase 4：Gymnasium 训练环境**、**Phase 5：SAC 训练**、**Phase 6：安全策略部署层**、**Phase 7：交互页面**、**Phase 8：交互 Agent**、**Phase 9：ROS2 接口** 和 **Phase 10：系统实验与项目包装**。
 
 ## 环境
 
@@ -32,7 +32,7 @@ ruff format --check .
 mypy rehab_sim scripts
 ```
 
-`check_config` 会加载 `configs/` 下的八个 YAML 文件并输出配置摘要。当前配置中的机器人、控制器、安全阈值、Agent 阈值和 ROS2 硬件参数仍是明确标记的仿真/开发占位值，不能用于控制真实机器人。
+`check_config` 会加载 `configs/` 下的九个 YAML 文件并输出配置摘要。当前配置中的机器人、控制器、安全阈值、Agent 阈值、ROS2 硬件参数和实验参数仍是明确标记的仿真/开发占位值，不能用于控制真实机器人。
 
 ## Phase 1：MuJoCo 三自由度机器人
 
@@ -286,6 +286,48 @@ colcon build --base-paths ros2_ws --symlink-install
 ```
 
 当前阶段完成的是 ROS2 接口和无人体接触的仿真/台架准备；没有连接具体真实机器人驱动，也没有进行人体接触测试。任何通信超时都会选择安全回退参数，固定参数模式可以独立于策略运行。
+
+## Phase 10：系统实验与项目包装
+
+Phase 10 提供统一的一键对比入口 `scripts/run_phase10_experiments.py`。默认实验矩阵包含五种方法和三类虚拟患者：
+
+- 固定导纳 `fixed_admittance`；
+- 规则自适应 `rule_adaptive`；
+- 模糊规则 `fuzzy_control`；
+- SAC；
+- PPO。
+
+所有方法使用同一个 MuJoCo/Gymnasium 任务和同一个四维低频导纳参数动作空间。默认配置、方法阈值、患者矩阵、随机种子和训练步数位于 `configs/phase10.yaml`，SAC/PPO 训练只调整导纳参数，不发布电机命令。
+
+完整实验：
+
+```bash
+python3 -m scripts.run_phase10_experiments
+```
+
+新环境快速验收：
+
+```bash
+python3 -m scripts.run_phase10_experiments --quick \
+  --output-dir experiments/reports/phase10_quick
+```
+
+可选录制无头 MuJoCo 演示视频：
+
+```bash
+python3 -m scripts.run_phase10_experiments --quick --record-video
+```
+
+输出目录包含：
+
+- `episode_metrics.csv`：逐 episode 原始指标；
+- `summary.csv` / `summary.json`：按方法和患者聚合的均值、标准差、成功率、安全率、误差、峰值力、患者主动功率、辅助能量和参数振荡率；
+- `success_rate.png`、`tracking_force_comparison.png`、`parameter_stability.png`：自动生成图表；
+- `phase10_report.md`：带配置哈希、Git commit 和限制说明的实验报告；
+- `models/`：短周期 SAC/PPO 模型及 VecNormalize 统计；
+- `demo_*.mp4`：可选的无头 MuJoCo 轨迹演示视频。
+
+项目报告和简历描述分别位于 [docs/phase10_project_report.md](docs/phase10_project_report.md) 和 [docs/resume_description.md](docs/resume_description.md)。Phase 10 的仿真统计不能替代真实硬件阈值验证、人体实验或临床结论。
 
 ## 项目规范
 

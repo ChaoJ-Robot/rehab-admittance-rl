@@ -1,0 +1,41 @@
+schema_version: 1
+
+experiment:
+  task: point_to_point
+  patient_profiles: [mild, moderate, severe]
+  methods: [fixed_admittance, rule_adaptive, fuzzy_control, sac, ppo]
+  seeds: [0, 1, 2, 3, 4]
+  episodes_per_condition: 5
+  output_dir: experiments/reports/phase10
+  rl_config: configs/rl_sac.yaml
+
+training:
+  patient_profile: moderate
+  timesteps: 512
+  device: cpu
+
+plot:
+  dpi: 140
+
+video:
+  fps: 10
+  max_frames: 80
+
+policies:
+  rule_adaptive:
+    force_reference_n: 0.20
+    damping_gain: 0.60
+    theta_gain: 0.25
+    assist_gain: 0.75
+    velocity_gain: 0.20
+  fuzzy_control:
+    force_low_n: 0.15
+    force_high_n: 0.80
+    error_low_m: 0.01
+    error_high_m: 0.08
+    speed_low_mps: 0.03
+    speed_high_mps: 0.20
+    damping_force_weight: 0.55
+    damping_speed_weight: 0.25
+    assist_error_weight: 0.65
+    velocity_speed_weight: 0.40
