@@ -39,6 +39,7 @@ addopts = "-ra"
 target-version = "py310"
 line-length = 100
 src = ["rehab_sim", "scripts", "backend", "tests"]
+extend-exclude = ["build", "install", "log", "ros2_ws/build", "ros2_ws/install", "ros2_ws/log"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

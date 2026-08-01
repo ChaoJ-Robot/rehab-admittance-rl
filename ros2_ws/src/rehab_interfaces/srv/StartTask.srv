@@ -1,0 +1,6 @@
+string task_id
+string patient_profile
+float64 duration_s
+---
+bool accepted
+string message

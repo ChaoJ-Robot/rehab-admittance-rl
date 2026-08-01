@@ -1,0 +1,47 @@
+schema_version: 1
+
+ros2:
+  # Phase 9 transport settings. Hardware values remain explicit placeholders
+  # until the robot driver's validated interface is supplied.
+  namespace: rehab
+  mode: fixed
+  simulation:
+    enabled: true
+    adapter: simulation_adapter
+  hardware:
+    enabled: false
+    adapter: ros2_driver_placeholder
+    validation_required: true
+  topics:
+    joint_states: /joint_states
+    end_effector_state: /rehab_robot/end_effector_state
+    wrench: /rehab_robot/wrench
+    task_reference: /rehab/task/reference
+    system_state: /rehab/system/state
+    admittance_parameters: /rehab/admittance/parameters
+    policy_action: /rehab/policy/action
+    task_status: /rehab/task/status
+    safety_status: /rehab/safety/status
+    realtime_metrics: /rehab/metrics/realtime
+  rates:
+    state_publish_hz: 20.0
+    policy_update_hz: 5.0
+    watchdog_check_hz: 20.0
+  watchdog:
+    state_timeout_ms: 100.0
+    wrench_timeout_ms: 100.0
+    task_timeout_ms: 500.0
+    fallback_on_timeout: true
+  policy:
+    deterministic: true
+    model_path: ""
+    allow_rl: false
+  low_speed_test:
+    enabled: true
+    # Must remain inside safety.yaml velocity_scale bounds. This is half of
+    # the nominal scale and is intended for no-human-contact bench testing.
+    velocity_scale_limit: 0.50
+    max_duration_s: 30.0
+    human_contact_allowed: false
+    require_manual_enable: true
+  hardware_validation_required: true

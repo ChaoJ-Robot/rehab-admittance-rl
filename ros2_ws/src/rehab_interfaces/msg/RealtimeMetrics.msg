@@ -1,0 +1,11 @@
+std_msgs/Header header
+float64[3] pose
+float64[3] pose_error
+float64[3] velocity
+float64[3] interaction_wrench
+float64 human_power_w
+float64 fatigue
+float64 task_progress
+bool sensor_ok
+string safety_status
+string source

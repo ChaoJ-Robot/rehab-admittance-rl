@@ -21,6 +21,7 @@ CONFIG_FILENAMES: tuple[str, ...] = (
     "tasks.yaml",
     "rl_sac.yaml",
     "agent.yaml",
+    "ros2.yaml",
 )
 
 

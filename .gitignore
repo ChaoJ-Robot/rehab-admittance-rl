@@ -5,11 +5,17 @@ __pycache__/
 .mypy_cache/
 .venv/
 venv/
+build/
+install/
+log/
 node_modules/
 frontend/dist/
 *.tsbuildinfo
 frontend/vite.config.js
 frontend/vite.config.d.ts
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
 dist/
 build/
 *.egg-info/

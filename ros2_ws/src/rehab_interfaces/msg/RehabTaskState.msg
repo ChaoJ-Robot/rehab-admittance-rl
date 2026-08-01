@@ -1,0 +1,9 @@
+std_msgs/Header header
+string task_id
+string task_name
+string patient_profile
+string state
+float64 progress
+float64 elapsed_s
+bool enabled
+bool rl_enabled

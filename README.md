@@ -2,7 +2,7 @@
 
 基于安全强化学习与交互 Agent 的平面三自由度上肢康复机器人自适应导纳训练系统。
 
-当前仓库已完成 **Phase 0：仓库初始化**、**Phase 1：MuJoCo 三自由度机器人**、**Phase 2：固定参数导纳控制**、**Phase 3：虚拟患者**、**Phase 4：Gymnasium 训练环境**、**Phase 5：SAC 训练**、**Phase 6：安全策略部署层**、**Phase 7：交互页面** 和 **Phase 8：交互 Agent**。ROS2 业务逻辑仍按后续 Phase 顺序实现。
+当前仓库已完成 **Phase 0：仓库初始化**、**Phase 1：MuJoCo 三自由度机器人**、**Phase 2：固定参数导纳控制**、**Phase 3：虚拟患者**、**Phase 4：Gymnasium 训练环境**、**Phase 5：SAC 训练**、**Phase 6：安全策略部署层**、**Phase 7：交互页面**、**Phase 8：交互 Agent** 和 **Phase 9：ROS2 接口**。Phase 10 实验包装仍按后续 Phase 顺序实现。
 
 ## 环境
 
@@ -32,7 +32,7 @@ ruff format --check .
 mypy rehab_sim scripts
 ```
 
-`check_config` 会加载 `configs/` 下的七个 YAML 文件并输出配置摘要。当前配置中的机器人、控制器、安全阈值和 Agent 阈值仍是明确标记的仿真/开发占位值，不能用于控制真实机器人。
+`check_config` 会加载 `configs/` 下的八个 YAML 文件并输出配置摘要。当前配置中的机器人、控制器、安全阈值、Agent 阈值和 ROS2 硬件参数仍是明确标记的仿真/开发占位值，不能用于控制真实机器人。
 
 ## Phase 1：MuJoCo 三自由度机器人
 
@@ -252,6 +252,40 @@ cd frontend && npm run build
 ```
 
 Phase 8 不包含 ROS2 接口；后续如接入 LLM，也只能生成解释/语音文本，不能进入控制链路。
+
+## Phase 9：ROS2 与真实机器人接口
+
+ROS2 工作区位于 `ros2_ws/`，包含：
+
+- `rehab_interfaces`：导纳参数、策略动作、末端状态、力、任务状态、安全状态和实时指标消息，以及任务控制服务；
+- `rehab_robot_bridge`：仿真和 ROS2 驱动共用的 `RobotAdapter` 接口。桥接层订阅 `/joint_states`、`/rehab_robot/end_effector_state` 和 `/rehab_robot/wrench`，接收并审计任务空间导纳参数，不提供电机力矩或电流接口；具体硬件驱动仍需经过验证后接入；
+- `rehab_policy_node`：固定参数模式和确定性参数策略，所有参数经过既有独立安全监督器、通信看门狗和低速测试限幅；
+- `rehab_task_manager`：启动、暂停、停止、复位、患者配置和策略模式服务。
+
+ROS2 参数位于 `configs/ros2.yaml`。默认配置为固定参数、仿真输入、低速测试模式和 `hardware.enabled: false`；真实驱动接入前必须完成硬件限位、力矩/速度阈值、急停、使能和看门狗验证。低速模式只限制任务空间速度缩放，不改变控制器接口为电机命令。
+
+构建和启动：
+
+```bash
+source /opt/ros/humble/setup.bash
+python3 -m pip install -e .
+colcon build --base-paths ros2_ws --symlink-install
+source install/setup.bash
+
+ros2 run rehab_task_manager task_manager_node --ros-args -p config_dir:=$PWD/configs
+ros2 run rehab_robot_bridge robot_bridge_node --ros-args -p config_dir:=$PWD/configs
+ros2 run rehab_policy_node policy_node --ros-args -p config_dir:=$PWD/configs
+```
+
+Phase 9 验证：
+
+```bash
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q
+source /opt/ros/humble/setup.bash
+colcon build --base-paths ros2_ws --symlink-install
+```
+
+当前阶段完成的是 ROS2 接口和无人体接触的仿真/台架准备；没有连接具体真实机器人驱动，也没有进行人体接触测试。任何通信超时都会选择安全回退参数，固定参数模式可以独立于策略运行。
 
 ## 项目规范
 

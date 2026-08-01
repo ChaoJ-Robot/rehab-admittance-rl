@@ -77,3 +77,12 @@
 - 将 Agent 事件接入 FastAPI 快照、20 Hz WebSocket 和 `GET /api/agent/events` 审计接口。
 - 添加前端实时反馈提示和训练总结卡片。
 - 验证 Agent 异常不会影响仿真控制/安全层；本阶段不使用 LLM API，也不接入 ROS2。
+
+### Phase 9
+
+- 添加 `ros2_ws/src/rehab_interfaces` 自定义消息和任务控制服务。
+- 添加仿真/ROS2 驱动共用的 `RobotAdapter`、ROS2 状态桥和任务空间参数命令边界。
+- 添加固定参数/确定性参数策略节点，策略输出经过独立安全监督器，不发布电机力矩或电流。
+- 添加独立通信看门狗、通信中断回退和低速测试模式。
+- 添加 ROS2 任务管理节点、配置文件、核心单元测试、colcon 构建验证和 topic smoke test。
+- 默认硬件驱动保持关闭，真实机器人阈值和台架/人体测试仍未完成；不进入 Phase 10 实验包装。
