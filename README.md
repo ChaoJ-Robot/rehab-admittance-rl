@@ -2,7 +2,7 @@
 
 基于安全强化学习与交互 Agent 的平面三自由度上肢康复机器人自适应导纳训练系统。
 
-当前仓库已完成 **Phase 0：仓库初始化**、**Phase 1：MuJoCo 三自由度机器人**、**Phase 2：固定参数导纳控制**、**Phase 3：虚拟患者**、**Phase 4：Gymnasium 训练环境** 和 **Phase 5：SAC 训练**。部署安全层、页面、Agent 与 ROS2 业务逻辑仍按后续 Phase 顺序实现。
+当前仓库已完成 **Phase 0：仓库初始化**、**Phase 1：MuJoCo 三自由度机器人**、**Phase 2：固定参数导纳控制**、**Phase 3：虚拟患者**、**Phase 4：Gymnasium 训练环境**、**Phase 5：SAC 训练** 和 **Phase 6：安全策略部署层**。页面、Agent 与 ROS2 业务逻辑仍按后续 Phase 顺序实现。
 
 ## 环境
 
@@ -181,7 +181,19 @@ python3 -m scripts.evaluate_sac \
   --vecnormalize experiments/trained_models/phase5_sac/<run>/seed_0000/vecnormalize.pkl
 ```
 
-Phase 5 的安全边界仍由 Phase 4 仿真环境提供，尚未实现 Phase 6 独立安全监督器、策略超时回退或真实机器人部署。
+## Phase 6：安全策略部署层
+
+独立安全层位于 `rehab_sim/safety/`，不导入 SAC 或 Stable-Baselines3。策略动作经过以下固定顺序处理：动作裁剪、参数变化率限制、参数边界投影、稳定性检查和安全状态检查。策略输出仍只会转化为 `[Dx, Dy, Dtheta, Ka, velocity_scale]`，不会发布关节力矩或电机命令。
+
+安全运行时会在模型加载失败、推理异常/超时、动作或状态出现 NaN、传感器掉线、交互力接近阈值、力矩/速度/加速度超限时切换到配置的保守固定参数。安全配置中的阈值目前全部是仿真占位值，`hardware_validation_required: true`，不能用于真实患者或真机运行。
+
+运行 Phase 6 安全单元测试：
+
+```bash
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q tests/unit/test_safety.py
+```
+
+Phase 6 不包含交互页面、Agent 或 ROS2 接口。
 
 ## 项目规范
 

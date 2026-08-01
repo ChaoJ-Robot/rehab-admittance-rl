@@ -1,18 +1,32 @@
 schema_version: 1
 
 safety:
-  enabled: false
-  # These thresholds are placeholders until the robot and sensor data sheets
-  # are provided. No real robot operation is permitted with this template.
-  interaction_force_limit: TODO_CONFIGURE
-  interaction_torque_limit: TODO_CONFIGURE
-  task_speed_limit: TODO_CONFIGURE
-  task_acceleration_limit: TODO_CONFIGURE
-  workspace: TODO_CONFIGURE
-  parameter_bounds: TODO_CONFIGURE
-  parameter_rate_limits: TODO_CONFIGURE
-  policy_timeout_ms: TODO_CONFIGURE
-  fallback_parameters: TODO_CONFIGURE
+  # Phase 6 software supervisor is enabled for simulation tests only. These
+  # values are not approved limits for a physical robot or patient training.
+  enabled: true
+  mode: simulation_only
+  interaction_force_limit: 5.0       # N, simulation placeholder
+  interaction_torque_limit: 0.50     # N*m, simulation placeholder
+  task_speed_limit: 0.50             # task-space norm, simulation placeholder
+  task_acceleration_limit: 3.0       # task-space norm, simulation placeholder
+  parameter_bounds:
+    damping_x: [1.0, 10.0]
+    damping_y: [1.0, 10.0]
+    damping_theta: [0.05, 1.0]
+    assist_gain: [0.0, 5.0]
+    velocity_scale: [0.5, 1.5]
+  parameter_rate_limits:
+    damping_xy: 0.10
+    damping_theta: 0.01
+    assist_gain: 0.20
+    velocity_scale: 0.02
+  policy_timeout_ms: 200.0
+  force_warning_ratio: 0.90
+  fallback_parameters:
+    damping: [3.0, 3.0, 0.25]
+    assist_gain: 0.0
+    velocity_scale: 1.0
+  hardware_validation_required: true
 
 # Simulation termination thresholds used by Phase 4. These are not hardware
 # safety limits and must be replaced before real-robot work.
