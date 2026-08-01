@@ -2,7 +2,7 @@
 
 基于安全强化学习与交互 Agent 的平面三自由度上肢康复机器人自适应导纳训练系统。
 
-当前仓库已完成 **Phase 0：仓库初始化**、**Phase 1：MuJoCo 三自由度机器人**、**Phase 2：固定参数导纳控制**、**Phase 3：虚拟患者** 和 **Phase 4：Gymnasium 训练环境**。强化学习训练、部署安全层、页面、Agent 与 ROS2 业务逻辑仍按后续 Phase 顺序实现。
+当前仓库已完成 **Phase 0：仓库初始化**、**Phase 1：MuJoCo 三自由度机器人**、**Phase 2：固定参数导纳控制**、**Phase 3：虚拟患者**、**Phase 4：Gymnasium 训练环境** 和 **Phase 5：SAC 训练**。部署安全层、页面、Agent 与 ROS2 业务逻辑仍按后续 Phase 顺序实现。
 
 ## 环境
 
@@ -143,6 +143,45 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q
 ```
 
 该阶段只提供环境和固定控制器基线接口，不包含 SAC 训练脚本或真实机器人安全部署。
+
+## Phase 5：SAC 训练
+
+训练入口为 `scripts/train_sac.py`。SAC 使用 `MultiInputPolicy` 读取 Phase 4 的结构化观测，通过 `VecNormalize` 归一化观测和奖励；策略动作仍然是低频的四维导纳参数增量，不是关节力矩或电机命令。训练脚本支持配置文件中的多随机种子，并支持命令行覆盖训练步数、任务、患者、评估频率和设备。
+
+按配置运行五个随机种子：
+
+```bash
+python3 -m scripts.train_sac
+```
+
+快速仿真 smoke run：
+
+```bash
+python3 -m scripts.train_sac \
+  --run-name smoke \
+  --total-timesteps 2000 \
+  --seeds 0 \
+  --learning-starts 256 \
+  --device cpu
+```
+
+每个 run 目录包含：
+
+- `final_model.zip` 和 `vecnormalize.pkl`；
+- 定期 SAC checkpoint、replay buffer 和归一化统计；
+- TensorBoard event 文件；
+- 自动评估历史、成功率、交互力和参数变化/振荡指标；
+- 配置 SHA-256、Git commit 和命令行元数据。
+
+加载已保存模型进行评估：
+
+```bash
+python3 -m scripts.evaluate_sac \
+  --model experiments/trained_models/phase5_sac/<run>/seed_0000/final_model.zip \
+  --vecnormalize experiments/trained_models/phase5_sac/<run>/seed_0000/vecnormalize.pkl
+```
+
+Phase 5 的安全边界仍由 Phase 4 仿真环境提供，尚未实现 Phase 6 独立安全监督器、策略超时回退或真实机器人部署。
 
 ## 项目规范
 

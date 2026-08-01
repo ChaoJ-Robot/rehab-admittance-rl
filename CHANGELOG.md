@@ -41,3 +41,12 @@
 - 添加任务成功、有限时域和仿真异常终止逻辑。
 - 添加 SB3 `check_env`、随机策略无 NaN 和固定种子可重复性集成测试。
 - 添加 `scripts.check_phase4_envs` 环境验证入口；暂不实现 SAC 训练和安全部署。
+
+### Phase 5
+
+- 添加基于 Stable-Baselines3 `SAC("MultiInputPolicy")` 的参数调节训练脚本。
+- 使用 `VecNormalize` 对结构化观测和奖励进行训练归一化。
+- 添加 TensorBoard 日志、定期 checkpoint、replay buffer 和 VecNormalize 统计保存。
+- 添加自动确定性评估、成功率历史和多随机种子汇总。
+- 添加模型/归一化统计的保存加载验证，以及配置哈希和 Git commit 元数据。
+- 添加奖励、交互力、参数变化量和参数振荡率评估指标；未实现 Phase 6 独立安全部署层。

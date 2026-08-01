@@ -3,20 +3,46 @@ schema_version: 1
 algorithm: SAC
 
 training:
-  total_timesteps: TODO_CONFIGURE
-  random_seeds: TODO_CONFIGURE
-  checkpoint_frequency: TODO_CONFIGURE
-  evaluation_frequency: TODO_CONFIGURE
+  total_timesteps: 20000       # simulation placeholder; override from CLI
+  random_seeds: [0, 1, 2, 3, 4]
+  checkpoint_frequency: 2000   # environment steps
+  evaluation_frequency: 1000   # environment steps
   parameter_update_hz: 5.0
+  evaluation_episodes: 5
 
 observation:
-  window_seconds: TODO_CONFIGURE
-  statistics: TODO_CONFIGURE
+  window_seconds: 0.5
+  statistics: normalized_structured_observation
 
 action:
   semantics: incremental_parameter_update
   parameters: [delta_damping_xy, delta_damping_theta, delta_assist_gain, delta_velocity_scale]
-  bounds: TODO_CONFIGURE
+  bounds: [-1.0, 1.0]
+
+environment:
+  task: point_to_point
+  patient_profile: moderate
+  n_envs: 1
+
+normalization:
+  enabled: true
+  normalize_observation: true
+  normalize_reward: true
+  clip_observation: 10.0
+  clip_reward: 10.0
+
+sac:
+  learning_rate: 0.0003
+  buffer_size: 50000
+  learning_starts: 1000
+  batch_size: 64
+  tau: 0.005
+  gamma: 0.99
+  train_frequency: 1
+  gradient_steps: 1
+  ent_coef: auto
+  policy_net_arch: [128, 128]
+  device: auto
 
 reward:
   progress: 2.0
