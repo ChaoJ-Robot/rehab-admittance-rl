@@ -1,0 +1,34 @@
+schema_version: 1
+
+profiles:
+  mild:
+    strength_scale: TODO_CONFIGURE
+    coordination_scale: TODO_CONFIGURE
+    reaction_delay_ms: TODO_CONFIGURE
+    directional_bias: TODO_CONFIGURE
+    force_noise_std: TODO_CONFIGURE
+    tremor_amplitude: TODO_CONFIGURE
+    tremor_frequency_hz: TODO_CONFIGURE
+    fatigue_rate: TODO_CONFIGURE
+    recovery_rate: TODO_CONFIGURE
+  moderate:
+    strength_scale: TODO_CONFIGURE
+    coordination_scale: TODO_CONFIGURE
+    reaction_delay_ms: TODO_CONFIGURE
+    directional_bias: TODO_CONFIGURE
+    force_noise_std: TODO_CONFIGURE
+    tremor_amplitude: TODO_CONFIGURE
+    tremor_frequency_hz: TODO_CONFIGURE
+    fatigue_rate: TODO_CONFIGURE
+    recovery_rate: TODO_CONFIGURE
+  severe:
+    strength_scale: TODO_CONFIGURE
+    coordination_scale: TODO_CONFIGURE
+    reaction_delay_ms: TODO_CONFIGURE
+    directional_bias: TODO_CONFIGURE
+    force_noise_std: TODO_CONFIGURE
+    tremor_amplitude: TODO_CONFIGURE
+    tremor_frequency_hz: TODO_CONFIGURE
+    fatigue_rate: TODO_CONFIGURE
+    recovery_rate: TODO_CONFIGURE
+

@@ -1,0 +1,30 @@
+schema_version: 1
+
+algorithm: SAC
+
+training:
+  total_timesteps: TODO_CONFIGURE
+  random_seeds: TODO_CONFIGURE
+  checkpoint_frequency: TODO_CONFIGURE
+  evaluation_frequency: TODO_CONFIGURE
+
+observation:
+  window_seconds: TODO_CONFIGURE
+  statistics: TODO_CONFIGURE
+
+action:
+  semantics: incremental_parameter_update
+  parameters: [delta_damping_xy, delta_damping_theta, delta_assist_gain, delta_velocity_scale]
+  bounds: TODO_CONFIGURE
+
+reward:
+  progress: TODO_CONFIGURE
+  normalized_tracking_error: TODO_CONFIGURE
+  excessive_force_penalty: TODO_CONFIGURE
+  motion_jerk_penalty: TODO_CONFIGURE
+  robot_assistance_energy: TODO_CONFIGURE
+  parameter_change: TODO_CONFIGURE
+  positive_human_power: TODO_CONFIGURE
+  task_success: TODO_CONFIGURE
+  unsafe_termination: TODO_CONFIGURE
+

@@ -1,0 +1,24 @@
+schema_version: 1
+
+admittance:
+  # First version keeps mass and stiffness fixed; values must be identified
+  # and approved before a controller is implemented.
+  mass:
+    x: TODO_CONFIGURE
+    y: TODO_CONFIGURE
+    theta: TODO_CONFIGURE
+  damping:
+    x: TODO_CONFIGURE
+    y: TODO_CONFIGURE
+    theta: TODO_CONFIGURE
+  stiffness:
+    x: TODO_CONFIGURE
+    y: TODO_CONFIGURE
+    theta: TODO_CONFIGURE
+  assist_gain: TODO_CONFIGURE
+  velocity_scale: TODO_CONFIGURE
+
+update_policy:
+  rl_update_hz: TODO_CONFIGURE
+  max_parameter_delta_per_update: TODO_CONFIGURE
+

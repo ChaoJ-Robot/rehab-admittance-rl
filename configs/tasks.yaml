@@ -1,0 +1,19 @@
+schema_version: 1
+
+tasks:
+  point_to_point:
+    target_distance: TODO_CONFIGURE
+    target_radius: TODO_CONFIGURE
+    reference_speed: TODO_CONFIGURE
+    task_duration: TODO_CONFIGURE
+  circle_tracking:
+    path_radius: TODO_CONFIGURE
+    reference_speed: TODO_CONFIGURE
+    path_width: TODO_CONFIGURE
+    task_duration: TODO_CONFIGURE
+  figure8_tracking:
+    path_width: TODO_CONFIGURE
+    reference_speed: TODO_CONFIGURE
+    path_width_tolerance: TODO_CONFIGURE
+    task_duration: TODO_CONFIGURE
+

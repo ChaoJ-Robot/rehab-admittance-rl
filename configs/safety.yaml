@@ -1,0 +1,16 @@
+schema_version: 1
+
+safety:
+  enabled: false
+  # These thresholds are placeholders until the robot and sensor data sheets
+  # are provided. No real robot operation is permitted with this template.
+  interaction_force_limit: TODO_CONFIGURE
+  interaction_torque_limit: TODO_CONFIGURE
+  task_speed_limit: TODO_CONFIGURE
+  task_acceleration_limit: TODO_CONFIGURE
+  workspace: TODO_CONFIGURE
+  parameter_bounds: TODO_CONFIGURE
+  parameter_rate_limits: TODO_CONFIGURE
+  policy_timeout_ms: TODO_CONFIGURE
+  fallback_parameters: TODO_CONFIGURE
+

@@ -1,0 +1,31 @@
+schema_version: 1
+
+robot:
+  name: planar_3dof_rehabilitation_robot
+  dof: 3
+  task_space: [x, y, theta]
+  interaction_wrench: [Fx, Fy, Tz]
+  joint_names: [joint1, joint2, joint3]
+  end_effector_site: TODO_CONFIGURE
+  mujoco_model: TODO_CONFIGURE
+
+coordinate_system:
+  task_frame: TODO_CONFIGURE
+  base_frame: TODO_CONFIGURE
+  positive_rotation: TODO_CONFIGURE
+
+units:
+  joint_position: rad
+  joint_velocity: rad_per_s
+  task_position: m
+  task_orientation: rad
+  force: N
+  torque: N_m
+
+# Hardware-dependent limits are intentionally left unspecified in Phase 0.
+limits:
+  joint_position: TODO_CONFIGURE
+  joint_velocity: TODO_CONFIGURE
+  joint_effort: TODO_CONFIGURE
+  workspace: TODO_CONFIGURE
+
