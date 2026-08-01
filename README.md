@@ -2,7 +2,7 @@
 
 基于安全强化学习与交互 Agent 的平面三自由度上肢康复机器人自适应导纳训练系统。
 
-当前仓库已完成 **Phase 0：仓库初始化**、**Phase 1：MuJoCo 三自由度机器人** 和 **Phase 2：固定参数导纳控制**。当前只实现数字孪生、运动学、末端外力注入、模型限位、可视化和固定参数导纳基线；虚拟患者、Gymnasium 环境、强化学习、页面、Agent 与 ROS2 业务逻辑仍按后续 Phase 顺序实现。
+当前仓库已完成 **Phase 0：仓库初始化**、**Phase 1：MuJoCo 三自由度机器人**、**Phase 2：固定参数导纳控制** 和 **Phase 3：虚拟患者**。当前只实现数字孪生、运动学、末端外力注入、模型限位、可视化、固定参数导纳基线和参数化患者力生成；Gymnasium 环境、强化学习、页面、Agent 与 ROS2 业务逻辑仍按后续 Phase 顺序实现。
 
 ## 环境
 
@@ -97,6 +97,32 @@ python3 -m scripts.run_phase2_baseline --experiment reverse --duration 3
 - `*_baseline.json`：样本数、峰值速度、峰值力和漂移摘要。
 
 Phase 2 不包含虚拟患者、RL 策略、随机探索、安全策略部署或 Agent。
+
+## Phase 3：虚拟患者
+
+虚拟患者位于 `rehab_sim/patients/`，根据以下模型生成交互力：
+
+```text
+F_h = K_h(X_r-X) + D_h(dX_r-dX)
+      + F_bias + F_noise + F_tremor
+```
+
+已实现：
+
+- 轻度、中度、重度三类 YAML 配置；
+- 主动阻抗力、方向偏置、随机噪声和周期性震颤；
+- 反应延迟队列；
+- 基于患者主动功率的疲劳累积和休息恢复；
+- 独立随机种子、重置和可重复输出；
+- 患者主动功率、疲劳和力分项状态记录。
+
+运行患者力生成演示：
+
+```bash
+python3 -m scripts.run_phase3_patient_demo --duration 8 --sample-time 0.01
+```
+
+结果默认写入 `experiments/reports/phase3_patients/`，每个患者配置包含 CSV 力/状态数据和 SVG 曲线。该脚本是开环患者力生成演示，不是 Gymnasium 环境，也不直接控制机器人。
 
 ## 项目规范
 

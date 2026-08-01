@@ -2,33 +2,41 @@ schema_version: 1
 
 profiles:
   mild:
-    strength_scale: TODO_CONFIGURE
-    coordination_scale: TODO_CONFIGURE
-    reaction_delay_ms: TODO_CONFIGURE
-    directional_bias: TODO_CONFIGURE
-    force_noise_std: TODO_CONFIGURE
-    tremor_amplitude: TODO_CONFIGURE
-    tremor_frequency_hz: TODO_CONFIGURE
-    fatigue_rate: TODO_CONFIGURE
-    recovery_rate: TODO_CONFIGURE
+    strength_scale: 0.90
+    coordination_scale: 0.95
+    reaction_delay_ms: 40
+    directional_bias: [0.00, 0.00, 0.00]
+    force_noise_std: [0.03, 0.03, 0.005]
+    tremor_amplitude: [0.005, 0.005, 0.002]
+    tremor_frequency_hz: 3.0
+    fatigue_rate: 0.02
+    recovery_rate: 0.08
+    base_stiffness: [18.0, 18.0, 1.0]
+    base_damping: [1.5, 1.5, 0.12]
+    power_normalization_w: 0.01
   moderate:
-    strength_scale: TODO_CONFIGURE
-    coordination_scale: TODO_CONFIGURE
-    reaction_delay_ms: TODO_CONFIGURE
-    directional_bias: TODO_CONFIGURE
-    force_noise_std: TODO_CONFIGURE
-    tremor_amplitude: TODO_CONFIGURE
-    tremor_frequency_hz: TODO_CONFIGURE
-    fatigue_rate: TODO_CONFIGURE
-    recovery_rate: TODO_CONFIGURE
+    strength_scale: 0.60
+    coordination_scale: 0.72
+    reaction_delay_ms: 150
+    directional_bias: [0.05, -0.03, 0.01]
+    force_noise_std: [0.06, 0.06, 0.010]
+    tremor_amplitude: [0.015, 0.015, 0.005]
+    tremor_frequency_hz: 4.0
+    fatigue_rate: 0.04
+    recovery_rate: 0.06
+    base_stiffness: [12.0, 12.0, 0.7]
+    base_damping: [1.2, 1.2, 0.10]
+    power_normalization_w: 0.01
   severe:
-    strength_scale: TODO_CONFIGURE
-    coordination_scale: TODO_CONFIGURE
-    reaction_delay_ms: TODO_CONFIGURE
-    directional_bias: TODO_CONFIGURE
-    force_noise_std: TODO_CONFIGURE
-    tremor_amplitude: TODO_CONFIGURE
-    tremor_frequency_hz: TODO_CONFIGURE
-    fatigue_rate: TODO_CONFIGURE
-    recovery_rate: TODO_CONFIGURE
-
+    strength_scale: 0.30
+    coordination_scale: 0.50
+    reaction_delay_ms: 280
+    directional_bias: [0.10, -0.08, 0.02]
+    force_noise_std: [0.10, 0.10, 0.020]
+    tremor_amplitude: [0.025, 0.025, 0.008]
+    tremor_frequency_hz: 5.0
+    fatigue_rate: 0.06
+    recovery_rate: 0.04
+    base_stiffness: [7.0, 7.0, 0.5]
+    base_damping: [1.0, 1.0, 0.08]
+    power_normalization_w: 0.01
