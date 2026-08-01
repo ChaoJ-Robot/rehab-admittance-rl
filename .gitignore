@@ -5,6 +5,11 @@ __pycache__/
 .mypy_cache/
 .venv/
 venv/
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
 dist/
 build/
 *.egg-info/
@@ -17,4 +22,3 @@ experiments/reports/*
 !experiments/trained_models/.gitkeep
 !experiments/evaluation_results/.gitkeep
 !experiments/reports/.gitkeep
-

@@ -1,0 +1,98 @@
+"""API models shared by the Phase 7 backend and frontend."""
+
+from __future__ import annotations
+
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+TaskName = Literal["point_to_point", "circle_tracking", "figure8_tracking"]
+PatientProfile = Literal["mild", "moderate", "severe"]
+ControlMode = Literal["fixed", "rl"]
+SessionState = Literal["idle", "running", "paused", "completed", "stopped"]
+
+
+class StartRequest(BaseModel):
+    """Configuration for a simulation-only training session."""
+
+    task: TaskName = "point_to_point"
+    patient_profile: PatientProfile = "moderate"
+    mode: ControlMode = "fixed"
+    duration_s: float | None = Field(default=None, gt=0.0, le=600.0)
+
+
+class ModeRequest(BaseModel):
+    """Requested controller mode."""
+
+    mode: ControlMode
+
+
+class Telemetry(BaseModel):
+    """One 20 Hz task-space telemetry sample."""
+
+    timestamp: float
+    elapsed_s: float
+    task: TaskName
+    patient_profile: PatientProfile
+    mode: ControlMode
+    state: SessionState
+    reference_pose: list[float]
+    actual_pose: list[float]
+    tracking_error: list[float]
+    end_effector_velocity: list[float]
+    interaction_force: list[float]
+    human_power_w: float
+    fatigue: float
+    admittance_parameters: list[float]
+    rl_action: list[float]
+    task_progress: float
+    score: float
+    safety_status: Literal["safe", "fallback", "paused", "idle"]
+    safety_reasons: list[str]
+
+
+class TrainingReport(BaseModel):
+    """Summary produced when a session stops or completes."""
+
+    completed: bool
+    completion_rate: float
+    duration_s: float
+    average_tracking_error: float
+    peak_interaction_force: float
+    mean_interaction_force: float
+    motion_smoothness: float
+    patient_active_work: float
+    robot_assistance_work: float
+    parameter_change_total: float
+    safety_trigger_count: int
+    final_score: float
+
+
+class SessionSnapshot(BaseModel):
+    """Current session state returned by REST and WebSocket endpoints."""
+
+    session_id: str
+    state: SessionState
+    task: TaskName
+    patient_profile: PatientProfile
+    mode: ControlMode
+    elapsed_s: float
+    duration_s: float
+    task_progress: float
+    score: float
+    telemetry: Telemetry | None
+    report: TrainingReport | None
+
+
+class ConfigSummary(BaseModel):
+    """Configuration choices exposed to the therapist page."""
+
+    tasks: list[TaskName]
+    patient_profiles: list[PatientProfile]
+    modes: list[ControlMode]
+    refresh_hz: int
+    simulation_only: bool
+    hardware_validation_required: bool
+    parameter_bounds: dict[str, list[float]]
+    interaction_force_limit: float
+    task_speed_limit: float

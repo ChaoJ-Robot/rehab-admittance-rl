@@ -2,7 +2,7 @@
 
 基于安全强化学习与交互 Agent 的平面三自由度上肢康复机器人自适应导纳训练系统。
 
-当前仓库已完成 **Phase 0：仓库初始化**、**Phase 1：MuJoCo 三自由度机器人**、**Phase 2：固定参数导纳控制**、**Phase 3：虚拟患者**、**Phase 4：Gymnasium 训练环境**、**Phase 5：SAC 训练** 和 **Phase 6：安全策略部署层**。页面、Agent 与 ROS2 业务逻辑仍按后续 Phase 顺序实现。
+当前仓库已完成 **Phase 0：仓库初始化**、**Phase 1：MuJoCo 三自由度机器人**、**Phase 2：固定参数导纳控制**、**Phase 3：虚拟患者**、**Phase 4：Gymnasium 训练环境**、**Phase 5：SAC 训练**、**Phase 6：安全策略部署层** 和 **Phase 7：交互页面**。交互 Agent 与 ROS2 业务逻辑仍按后续 Phase 顺序实现。
 
 ## 环境
 
@@ -194,6 +194,43 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q tests/unit/test_safety.py
 ```
 
 Phase 6 不包含交互页面、Agent 或 ROS2 接口。
+
+## Phase 7：交互页面
+
+Phase 7 提供仿真专用的 FastAPI + WebSocket 后端和 React + TypeScript + Vite 前端。后端会话服务维护等待、训练、暂停、完成和停止状态，按 20 Hz 推送任务空间遥测；当前数据源是确定性的 simulation-only provider，不连接真实机器人，也不实现 Phase 8 Agent。
+
+启动后端：
+
+```bash
+python3 -m uvicorn backend.app.main:app --reload --port 8000
+```
+
+另开终端启动前端：
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+页面支持：
+
+- 点到点、圆轨迹和八字轨迹任务选择；
+- 轻度/中度/重度患者配置选择；
+- 固定导纳与 RL 参数调节模式切换；
+- 开始、暂停、继续和停止训练；
+- 参考/实际轨迹、`Fx/Fy/Tz` 力曲线和导纳参数曲线；
+- 任务进度、得分、安全状态、患者主动功率和疲劳估计；
+- 训练完成后的误差、峰值力、平滑度、主动做功和辅助做功摘要。
+
+Phase 7 验证：
+
+```bash
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q tests/integration/test_phase7_backend.py
+cd frontend && npm run build
+```
+
+Phase 7 不包含交互 Agent、LLM 调用、ROS2 接口或真实机器人控制。
 
 ## 项目规范
 
