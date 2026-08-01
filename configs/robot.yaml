@@ -6,8 +6,34 @@ robot:
   task_space: [x, y, theta]
   interaction_wrench: [Fx, Fy, Tz]
   joint_names: [joint1, joint2, joint3]
-  end_effector_site: TODO_CONFIGURE
-  mujoco_model: TODO_CONFIGURE
+  end_effector_site: tool_tip
+  mujoco_model: assets/mujoco/planar_rehab_robot.xml
+
+# Values below are derived from the imported CAD assembly and expressed in m.
+# The tool offset is a CAD mesh envelope estimate and must be verified against
+# the physical handle before any hardware use.
+kinematics:
+  joint1_origin_m: [-8.54471886e-17, 0.3]
+  link2_offset_m: [-0.014892257, -0.379708073]
+  # Collinearity correction: same direction as link2 at the declared zero pose.
+  link3_offset_m: [-0.0133246509802806, -0.33973880165511]
+  tool_offset_m: [0.0, -0.2]
+  tool_height_m: 0.245
+  tool_offset_source: CAD_mesh_envelope_estimate
+  tool_offset_requires_hardware_validation: true
+
+joint_limits:
+  position_rad:
+    joint1: [-3.14159265, 3.14159265]
+    joint2: [-3.14159265, 3.14159265]
+    joint3: [-3.14159265, 3.14159265]
+  velocity_rad_per_s: TODO_CONFIGURE
+  effort_N_m: TODO_CONFIGURE
+
+simulation:
+  timestep_s: 0.002
+  gravity_m_per_s2: [0.0, 0.0, -9.81]
+  contact_geometry_enabled: false
 
 coordinate_system:
   task_frame: TODO_CONFIGURE
@@ -28,4 +54,3 @@ limits:
   joint_velocity: TODO_CONFIGURE
   joint_effort: TODO_CONFIGURE
   workspace: TODO_CONFIGURE
-

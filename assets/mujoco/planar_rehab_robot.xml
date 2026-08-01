@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mujoco model="planar_rehab_robot">
+  <compiler angle="radian" meshdir="meshes" autolimits="true" coordinate="local"/>
+  <option gravity="0 0 -9.81" integrator="implicitfast" timestep="0.002"/>
+  <size njmax="100" nconmax="100"/>
+  <visual>
+    <global offwidth="1280" offheight="720"/>
+    <headlight ambient="0.16 0.16 0.16" diffuse="0.42 0.42 0.42" specular="0.08 0.08 0.08"/>
+    <map znear="0.01" zfar="20" fogstart="3" fogend="12"/>
+    <rgba haze="0.72 0.78 0.86 1"/>
+  </visual>
+  <asset>
+    <mesh name="base_link_mesh" file="base_link.stl"/>
+    <mesh name="link1_mesh" file="link1.stl"/>
+    <mesh name="link2_mesh" file="link2.stl"/>
+    <mesh name="link3_mesh" file="link3.stl"/>
+    <mesh name="display_mesh" file="display.stl"/>
+    <texture name="skybox_tex" type="skybox" builtin="gradient"
+      rgb1="0.48 0.60 0.76" rgb2="0.92 0.95 1.0" width="512" height="512"/>
+    <texture name="ground_tex" type="2d" builtin="checker"
+      rgb1="0.035 0.035 0.035" rgb2="0.62 0.62 0.62" width="512" height="512"
+      mark="edge" markrgb="0.12 0.12 0.12"/>
+    <material name="ground_mat" texture="ground_tex" texrepeat="6 6" reflectance="0.04"/>
+    <material name="base_mat" rgba="0.25 0.28 0.32 1"/>
+    <material name="link1_mat" rgba="0.85 0.42 0.12 1"/>
+    <material name="link2_mat" rgba="0.12 0.48 0.85 1"/>
+    <material name="link3_mat" rgba="0.18 0.72 0.38 1"/>
+    <material name="display_mat" rgba="0.25 0.80 1.0 0.25"/>
+  </asset>
+  <worldbody>
+    <light name="key_light" pos="1.5 -1.5 3.5" dir="-0.25 0.25 -1"
+      directional="true" diffuse="0.48 0.48 0.45" specular="0.12 0.12 0.12"/>
+    <light name="fill_light" pos="-2.0 1.5 2.2" dir="0.45 -0.35 -1"
+      directional="true" diffuse="0.16 0.20 0.28" specular="0.04 0.04 0.04"/>
+    <light name="rim_light" pos="0 0 -0.2" dir="0 0 1"
+      directional="true" diffuse="0.06 0.08 0.12" specular="0.02 0.02 0.02"/>
+    <geom name="ground_plane" type="plane" pos="0 0 -1.045" size="3 3 0.02"
+      material="ground_mat" contype="0" conaffinity="0"/>
+    <body name="base_link">
+        <inertial pos="0.000278710721 0.0971014385 -0.521168606" mass="30" diaginertia="4.76278023 7.60489063 7.06317086"/>
+      <!-- Imported CAD is display geometry. Collision is disabled because the
+           base mesh includes the table/frame and overlaps the moving links. -->
+      <geom name="base_link_geom" type="mesh" mesh="base_link_mesh" material="base_mat" contype="0" conaffinity="0"/>
+      <geom name="display_geom" type="mesh" mesh="display_mesh" material="display_mat" contype="0" conaffinity="0"/>
+      <body name="link1" pos="-8.54471886e-17 0.3 -0.34">
+        <inertial pos="-0.00533981321 -0.137917299 0.06136547" mass="4" diaginertia="0.112529174 0.029334738 0.102010412"/>
+        <joint name="joint1" type="hinge" axis="0 0 1" limited="true" range="-3.14159265 3.14159265" damping="0.05" frictionloss="0.01"/>
+        <geom name="link1_geom" type="mesh" mesh="link1_mesh" material="link1_mat" contype="0" conaffinity="0"/>
+        <body name="link2" pos="-0.014892257 -0.379708073 0">
+        <inertial pos="-0.0111210286 -0.225497878 0.137607541" mass="3" diaginertia="0.0515999048 0.00674458601 0.0516512444"/>
+          <joint name="joint2" type="hinge" axis="0 0 1" limited="true" range="-3.14159265 3.14159265" damping="0.05" frictionloss="0.01"/>
+          <geom name="link2_geom" type="mesh" mesh="link2_mesh" material="link2_mat" contype="0" conaffinity="0"/>
+          <body name="link3" pos="-0.0133246509802806 -0.33973880165511 0">
+        <inertial pos="-0.00427750475 -0.038462517 0.210040768" mass="1" diaginertia="0.00978668911 0.00356942998 0.00895507753"/>
+            <joint name="joint3" type="hinge" axis="0 0 1" limited="true" range="-3.14159265 3.14159265" damping="0.05" frictionloss="0.01"/>
+            <geom name="link3_geom" type="mesh" mesh="link3_mesh" material="link3_mat" contype="0" conaffinity="0"/>
+            <!-- CAD-derived interaction point near the distal handle center. -->
+            <site name="tool_tip" pos="0 -0.200 0.245" size="0.012" rgba="1 0 0 1"/>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <!-- Control values are target joint angles in radians. -->
+    <position name="joint1_target" joint="joint1" kp="80" kv="8" ctrlrange="-3.14159265 3.14159265" ctrllimited="true"/>
+    <position name="joint2_target" joint="joint2" kp="80" kv="8" ctrlrange="-3.14159265 3.14159265" ctrllimited="true"/>
+    <position name="joint3_target" joint="joint3" kp="80" kv="8" ctrlrange="-3.14159265 3.14159265" ctrllimited="true"/>
+  </actuator>
+  <keyframe>
+    <!-- Zero pose: all three links are collinear. -->
+    <key name="zero" qpos="0 0 0" ctrl="0 0 0"/>
+  </keyframe>
+</mujoco>
