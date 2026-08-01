@@ -68,3 +68,12 @@
 - 支持开始、暂停、继续、停止、固定导纳/RL 模式切换和训练完成摘要。
 - 添加后端 REST/WebSocket 集成测试和前端 TypeScript/Vite 构建验证。
 - 当前页面数据源为 simulation-only，未实现 Phase 8 交互 Agent 或 ROS2。
+
+### Phase 8
+
+- 添加独立的规则式交互 Agent、阈值配置和结构化事件模型。
+- 添加跟踪误差、交互力、速度、患者不活跃、疲劳和安全状态事件检测。
+- 添加事件冷却、结构化日志、可选语音回调和训练总结模板。
+- 将 Agent 事件接入 FastAPI 快照、20 Hz WebSocket 和 `GET /api/agent/events` 审计接口。
+- 添加前端实时反馈提示和训练总结卡片。
+- 验证 Agent 异常不会影响仿真控制/安全层；本阶段不使用 LLM API，也不接入 ROS2。

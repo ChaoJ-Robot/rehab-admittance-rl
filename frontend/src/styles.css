@@ -44,6 +44,13 @@ button.danger { color: #a64e48; border-color: #efc6c1; }
 .metric-card small { color: #9aa6b4; font-size: 11px; }
 .progress-track { position: absolute; left: 18px; right: 18px; bottom: 14px; background: #e7edf4; height: 4px; border-radius: 9px; overflow: hidden; }
 .progress-track div { background: #4a8bc7; height: 100%; border-radius: inherit; transition: width .2s ease; }
+.agent-banner { display: flex; align-items: center; gap: 13px; padding: 13px 17px; margin-bottom: 18px; }
+.agent-mark { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px; background: #e6f0fb; color: #3978b8; font-size: 11px; font-weight: 800; }
+.agent-label { color: #8290a3; font-size: 11px; margin-bottom: 4px; }
+.agent-banner strong { color: #30445e; font-size: 13px; }
+.severity-positive .agent-mark { color: #2c9560; background: #e1f4e9; }
+.severity-warning .agent-mark { color: #bd7226; background: #fff0dc; }
+.severity-critical .agent-mark { color: #aa4f48; background: #ffebea; }
 .dashboard-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 18px; }
 .panel { min-width: 0; padding: 19px; }
 .chart-wrap { min-height: 170px; }
@@ -70,6 +77,9 @@ button.danger { color: #a64e48; border-color: #efc6c1; }
 .report-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
 .report-grid > div { border: 1px solid #e8eef4; border-radius: 10px; padding: 12px; }
 .report-grid strong { display: block; color: #30445e; margin-top: 8px; font-size: 16px; }
+.agent-summary { display: grid; gap: 6px; background: #f6f9fc; border: 1px solid #e8eef4; border-radius: 10px; padding: 13px; margin-bottom: 12px; }
+.agent-summary strong { color: #30445e; font-size: 13px; }
+.agent-summary span, .agent-summary small { color: #8290a3; font-size: 12px; }
 .empty-report { color: #9aa6b4; font-size: 13px; padding: 18px 0 5px; }
 footer { color: #9aa6b4; font-size: 11px; text-align: center; padding: 22px 0 0; }
 

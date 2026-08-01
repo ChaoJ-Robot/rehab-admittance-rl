@@ -2,7 +2,7 @@
 
 基于安全强化学习与交互 Agent 的平面三自由度上肢康复机器人自适应导纳训练系统。
 
-当前仓库已完成 **Phase 0：仓库初始化**、**Phase 1：MuJoCo 三自由度机器人**、**Phase 2：固定参数导纳控制**、**Phase 3：虚拟患者**、**Phase 4：Gymnasium 训练环境**、**Phase 5：SAC 训练**、**Phase 6：安全策略部署层** 和 **Phase 7：交互页面**。交互 Agent 与 ROS2 业务逻辑仍按后续 Phase 顺序实现。
+当前仓库已完成 **Phase 0：仓库初始化**、**Phase 1：MuJoCo 三自由度机器人**、**Phase 2：固定参数导纳控制**、**Phase 3：虚拟患者**、**Phase 4：Gymnasium 训练环境**、**Phase 5：SAC 训练**、**Phase 6：安全策略部署层**、**Phase 7：交互页面** 和 **Phase 8：交互 Agent**。ROS2 业务逻辑仍按后续 Phase 顺序实现。
 
 ## 环境
 
@@ -32,7 +32,7 @@ ruff format --check .
 mypy rehab_sim scripts
 ```
 
-`check_config` 会加载 `configs/` 下的六个 YAML 文件并输出配置摘要。当前配置中的机器人、控制器和安全阈值仍是明确标记的占位值，不能用于控制真实机器人。
+`check_config` 会加载 `configs/` 下的七个 YAML 文件并输出配置摘要。当前配置中的机器人、控制器、安全阈值和 Agent 阈值仍是明确标记的仿真/开发占位值，不能用于控制真实机器人。
 
 ## Phase 1：MuJoCo 三自由度机器人
 
@@ -197,7 +197,7 @@ Phase 6 不包含交互页面、Agent 或 ROS2 接口。
 
 ## Phase 7：交互页面
 
-Phase 7 提供仿真专用的 FastAPI + WebSocket 后端和 React + TypeScript + Vite 前端。后端会话服务维护等待、训练、暂停、完成和停止状态，按 20 Hz 推送任务空间遥测；当前数据源是确定性的 simulation-only provider，不连接真实机器人，也不实现 Phase 8 Agent。
+Phase 7 提供仿真专用的 FastAPI + WebSocket 后端和 React + TypeScript + Vite 前端。后端会话服务维护等待、训练、暂停、完成和停止状态，按 20 Hz 推送任务空间遥测；当前数据源是确定性的 simulation-only provider，不连接真实机器人。Phase 8 在此页面上层接入只读交互 Agent。
 
 启动后端：
 
@@ -230,7 +230,28 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q tests/integration/test_phase7_backend
 cd frontend && npm run build
 ```
 
-Phase 7 不包含交互 Agent、LLM 调用、ROS2 接口或真实机器人控制。
+Phase 7 本身不包含 LLM 调用、ROS2 接口或真实机器人控制；交互 Agent 在 Phase 8 独立接入。
+
+## Phase 8：交互 Agent
+
+Agent 位于 `rehab_sim/agent/`，第一版采用规则引擎，不依赖 LLM 或外部 API。它只读取遥测并生成文本反馈，不修改导纳参数、不发布控制命令，也不进入机器人控制闭环。跟踪误差、交互力、速度、患者主动功率和疲劳阈值位于 `configs/agent.yaml`。
+
+已实现：
+
+- 任务开始、跟踪良好、跟踪误差过大、交互力过大、速度过快/过慢、患者不活跃、疲劳和安全停止事件；
+- 事件冷却、结构化事件日志和可注入的可选语音播报回调；
+- 训练结束总结模板，包含亮点、风险提示和下一步建议；
+- Agent 异常隔离，Agent 失败不会中断遥测或安全控制；
+- WebSocket 实时反馈、`GET /api/agent/events` 审计接口和前端反馈提示/总结卡片。
+
+验证：
+
+```bash
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q
+cd frontend && npm run build
+```
+
+Phase 8 不包含 ROS2 接口；后续如接入 LLM，也只能生成解释/语音文本，不能进入控制链路。
 
 ## 项目规范
 

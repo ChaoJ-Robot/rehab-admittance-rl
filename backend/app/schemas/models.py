@@ -27,6 +27,26 @@ class ModeRequest(BaseModel):
     mode: ControlMode
 
 
+class AgentEventPayload(BaseModel):
+    """Rule-based Agent event delivered with telemetry."""
+
+    event: str
+    message: str
+    severity: Literal["info", "positive", "warning", "critical"]
+    timestamp_s: float
+    context: dict[str, object]
+
+
+class AgentSummaryPayload(BaseModel):
+    """Template-based Agent summary for a completed session."""
+
+    title: str
+    message: str
+    highlights: list[str]
+    recommendation: str
+    event_count: int
+
+
 class Telemetry(BaseModel):
     """One 20 Hz task-space telemetry sample."""
 
@@ -49,6 +69,7 @@ class Telemetry(BaseModel):
     score: float
     safety_status: Literal["safe", "fallback", "paused", "idle"]
     safety_reasons: list[str]
+    agent_event: AgentEventPayload | None = None
 
 
 class TrainingReport(BaseModel):
@@ -82,6 +103,8 @@ class SessionSnapshot(BaseModel):
     score: float
     telemetry: Telemetry | None
     report: TrainingReport | None
+    agent_event: AgentEventPayload | None = None
+    agent_summary: AgentSummaryPayload | None = None
 
 
 class ConfigSummary(BaseModel):

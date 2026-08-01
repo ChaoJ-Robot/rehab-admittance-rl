@@ -76,6 +76,12 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail="training report is not available")
         return snapshot.report
 
+    @app.get("/api/agent/events")
+    async def agent_events() -> list[Any]:
+        """Return all rule-based feedback events for audit/reporting."""
+
+        return app.state.session.agent_events()
+
     @app.websocket("/ws/telemetry")
     async def telemetry(websocket: WebSocket) -> None:
         await websocket.accept()

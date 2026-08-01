@@ -23,6 +23,23 @@ export interface Telemetry {
   score: number;
   safety_status: "safe" | "fallback" | "paused" | "idle";
   safety_reasons: string[];
+  agent_event: AgentEvent | null;
+}
+
+export interface AgentEvent {
+  event: string;
+  message: string;
+  severity: "info" | "positive" | "warning" | "critical";
+  timestamp_s: number;
+  context: Record<string, unknown>;
+}
+
+export interface AgentSummary {
+  title: string;
+  message: string;
+  highlights: string[];
+  recommendation: string;
+  event_count: number;
 }
 
 export interface TrainingReport {
@@ -52,6 +69,8 @@ export interface SessionSnapshot {
   score: number;
   telemetry: Telemetry | null;
   report: TrainingReport | null;
+  agent_event: AgentEvent | null;
+  agent_summary: AgentSummary | null;
 }
 
 export interface ConfigSummary {

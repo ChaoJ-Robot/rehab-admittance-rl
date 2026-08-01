@@ -20,6 +20,7 @@ CONFIG_FILENAMES: tuple[str, ...] = (
     "patient_profiles.yaml",
     "tasks.yaml",
     "rl_sac.yaml",
+    "agent.yaml",
 )
 
 
@@ -61,7 +62,7 @@ def load_config_bundle(
 
     The returned keys are file stems, for example ``robot`` for
     ``robot.yaml``. Missing files are allowed only when the caller does not
-    request them; the default Phase 0 bundle requires all six templates.
+    request them; the default bundle requires all project templates.
     """
 
     root = Path(config_dir)

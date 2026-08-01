@@ -15,6 +15,7 @@ def test_phase_zero_templates_load_as_mappings() -> None:
         "patient_profiles",
         "tasks",
         "rl_sac",
+        "agent",
     }
     assert all(isinstance(value, dict) for value in bundle.values())
 

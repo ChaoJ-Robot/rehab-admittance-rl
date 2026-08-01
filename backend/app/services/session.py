@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 import uuid
 from collections import deque
 from pathlib import Path
 
 import numpy as np
+from rehab_sim.agent import AgentEvent, AgentObservation, RuleBasedAgent, load_agent_config
 from rehab_sim.config import load_yaml
 from rehab_sim.controllers import AdmittanceParameters
 from rehab_sim.safety import (
@@ -25,6 +27,8 @@ from rehab_sim.tasks import (
 )
 
 from backend.app.schemas.models import (
+    AgentEventPayload,
+    AgentSummaryPayload,
     ConfigSummary,
     ControlMode,
     PatientProfile,
@@ -36,13 +40,15 @@ from backend.app.schemas.models import (
     TrainingReport,
 )
 
+LOGGER = logging.getLogger("rehab.backend.session")
+
 
 class TrainingSession:
     """Own one simulation-only session and expose a page-safe state machine.
 
     The session emits task-space telemetry at 20 Hz. It intentionally uses a
-    deterministic simulation data source; Phase 7 does not add an Agent,
-    ROS2 bridge, or real-robot command path.
+    deterministic simulation data source; the Phase 8 Agent only observes this
+    stream and cannot modify parameters, commands, or the control path.
     """
 
     refresh_hz = 20
@@ -53,6 +59,7 @@ class TrainingSession:
         self._task_config = load_yaml(self.root / "configs" / "tasks.yaml")
         self._admittance_config = load_yaml(self.root / "configs" / "admittance.yaml")
         self._safety_config = load_yaml(self.root / "configs" / "safety.yaml")
+        self._agent = RuleBasedAgent(load_agent_config(self.root / "configs" / "agent.yaml"))
         safety = load_safety_configuration(self._admittance_config, self._safety_config)
         self._supervisor = SafetySupervisor(safety)
         self._baseline = parameter_vector(AdmittanceParameters.from_config(self._admittance_config))
@@ -69,6 +76,8 @@ class TrainingSession:
         self._task: ReferenceTrajectory | None = None
         self._telemetry: Telemetry | None = None
         self._report: TrainingReport | None = None
+        self._last_agent_event: AgentEvent | None = None
+        self._agent_summary: AgentSummaryPayload | None = None
         self._history: deque[Telemetry] = deque(maxlen=2400)
         self._run_task: asyncio.Task[None] | None = None
         self._last_wall_time = time.monotonic()
@@ -87,6 +96,20 @@ class TrainingSession:
         """Return a copy of buffered telemetry for report consumers."""
 
         return list(self._history)
+
+    def agent_events(self) -> list[AgentEventPayload]:
+        """Return the structured Agent event log for the current session."""
+
+        return [
+            AgentEventPayload(
+                event=event.event,
+                message=event.message,
+                severity=event.severity,
+                timestamp_s=event.timestamp_s,
+                context=event.context,
+            )
+            for event in self._agent.events
+        ]
 
     def config_summary(self) -> ConfigSummary:
         """Return safe UI configuration choices and simulation limits."""
@@ -161,6 +184,12 @@ class TrainingSession:
         self._task = self._build_task(self._task_name, self._duration_s)
         self._telemetry = None
         self._report = None
+        try:
+            self._last_agent_event = self._agent.start(self._task_name, self._patient_profile)
+        except Exception:  # noqa: BLE001 - Agent failure cannot block session start
+            LOGGER.exception("agent_start_failed")
+            self._last_agent_event = None
+        self._agent_summary = None
         self._history.clear()
         self._error_sum = 0.0
         self._force_sum = 0.0
@@ -257,6 +286,29 @@ class TrainingSession:
         self._elapsed_s = min(self._duration_s, self._elapsed_s + self._tick_dt_s)
         if self._elapsed_s >= self._duration_s:
             self._state = "completed"
+        agent_observation = AgentObservation(
+            task=self._task_name,
+            elapsed_s=self._elapsed_s,
+            tracking_error_norm=error_norm,
+            interaction_force_norm=force_norm,
+            task_speed_norm=float(np.linalg.norm(velocity)),
+            human_power_w=human_power,
+            fatigue=float(np.clip(self._elapsed_s / max(self._duration_s, 1.0), 0.0, 1.0)),
+            task_progress=self._progress,
+            safety_status="fallback" if decision.fallback else "safe",
+        )
+        agent_event: AgentEvent | None = None
+        try:
+            agent_event = self._agent.observe(agent_observation, self._tick_dt_s)
+        except Exception:  # noqa: BLE001 - Agent failure cannot affect control
+            LOGGER.exception("agent_observe_failed")
+        if agent_event is not None:
+            self._last_agent_event = agent_event
+        completion_event: AgentEvent | None = None
+        if self._state == "completed":
+            self._report = self._make_report()
+            completion_event = self._complete_agent(agent_observation)
+        sample_agent_event = completion_event or agent_event
         telemetry = Telemetry(
             timestamp=time.time(),
             elapsed_s=self._elapsed_s,
@@ -277,11 +329,20 @@ class TrainingSession:
             score=self._score,
             safety_status="fallback" if decision.fallback else "safe",
             safety_reasons=list(decision.reasons),
+            agent_event=(
+                AgentEventPayload(
+                    event=sample_agent_event.event,
+                    message=sample_agent_event.message,
+                    severity=sample_agent_event.severity,
+                    timestamp_s=sample_agent_event.timestamp_s,
+                    context=sample_agent_event.context,
+                )
+                if sample_agent_event is not None
+                else None
+            ),
         )
         self._telemetry = telemetry
         self._history.append(telemetry)
-        if self._state == "completed":
-            self._report = self._make_report()
 
     def pause(self) -> SessionSnapshot:
         """Pause a running session without losing its telemetry history."""
@@ -305,6 +366,24 @@ class TrainingSession:
         if self._state in ("running", "paused"):
             self._state = "stopped"
             self._report = self._make_report()
+            observation = (
+                self._agent_observation_from_telemetry()
+                if self._telemetry is not None
+                else AgentObservation(
+                    task=self._task_name,
+                    elapsed_s=self._elapsed_s,
+                    tracking_error_norm=0.0,
+                    interaction_force_norm=0.0,
+                    task_speed_norm=0.0,
+                    human_power_w=0.0,
+                    fatigue=0.0,
+                    task_progress=self._progress,
+                    safety_status="safe",
+                )
+            )
+            completion_event = self._complete_agent(observation)
+            if completion_event is not None:
+                self._last_agent_event = completion_event
         self._cancel_run_task()
         return self.snapshot()
 
@@ -331,6 +410,47 @@ class TrainingSession:
             final_score=self._score,
         )
 
+    def _agent_observation_from_telemetry(self) -> AgentObservation:
+        """Convert the latest sample to a read-only Agent input for stop."""
+
+        if self._telemetry is None:
+            raise RuntimeError("telemetry is not available")
+        return AgentObservation(
+            task=self._telemetry.task,
+            elapsed_s=self._telemetry.elapsed_s,
+            tracking_error_norm=float(np.linalg.norm(self._telemetry.tracking_error)),
+            interaction_force_norm=float(np.linalg.norm(self._telemetry.interaction_force[:2])),
+            task_speed_norm=float(np.linalg.norm(self._telemetry.end_effector_velocity)),
+            human_power_w=self._telemetry.human_power_w,
+            fatigue=self._telemetry.fatigue,
+            task_progress=self._telemetry.task_progress,
+            safety_status=self._telemetry.safety_status,
+        )
+
+    def _complete_agent(self, observation: AgentObservation) -> AgentEvent | None:
+        """Run Agent summary generation outside the control path."""
+
+        if self._report is None:
+            return None
+        try:
+            report_data = (
+                self._report.model_dump()
+                if hasattr(self._report, "model_dump")
+                else self._report.dict()
+            )
+            event, summary = self._agent.complete(observation, report_data)
+            self._agent_summary = AgentSummaryPayload(
+                title=summary.title,
+                message=summary.message,
+                highlights=summary.highlights,
+                recommendation=summary.recommendation,
+                event_count=summary.event_count,
+            )
+            return event
+        except Exception:  # noqa: BLE001 - Agent failure cannot affect control
+            LOGGER.exception("agent_complete_failed")
+            return None
+
     def snapshot(self) -> SessionSnapshot:
         """Build a serializable snapshot without exposing mutable internals."""
 
@@ -346,4 +466,16 @@ class TrainingSession:
             score=self._score,
             telemetry=self._telemetry,
             report=self._report,
+            agent_event=(
+                AgentEventPayload(
+                    event=self._last_agent_event.event,
+                    message=self._last_agent_event.message,
+                    severity=self._last_agent_event.severity,
+                    timestamp_s=self._last_agent_event.timestamp_s,
+                    context=self._last_agent_event.context,
+                )
+                if self._last_agent_event is not None
+                else None
+            ),
+            agent_summary=self._agent_summary,
         )

@@ -1,0 +1,17 @@
+schema_version: 1
+
+agent:
+  enabled: true
+  mode: rules_only
+  speech_enabled: false
+  feedback_cooldown_s: 2.0
+  thresholds:
+    tracking_error_high_m: 0.030
+    tracking_error_good_m: 0.012
+    interaction_force_high_n: 0.40
+    task_speed_fast: 0.25
+    task_speed_slow: 0.01
+    human_power_low_w: 0.001
+    inactivity_duration_s: 1.0
+    fatigue_high: 0.65
+  hardware_validation_required: true

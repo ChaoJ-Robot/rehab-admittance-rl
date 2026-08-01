@@ -45,7 +45,9 @@ const initialSnapshot: SessionSnapshot = {
   task_progress: 0,
   score: 0,
   telemetry: null,
-  report: null
+  report: null,
+  agent_event: null,
+  agent_summary: null
 };
 
 function App() {
@@ -92,6 +94,7 @@ function App() {
   };
 
   const telemetry = snapshot.telemetry;
+  const agentEvent = snapshot.agent_event ?? telemetry?.agent_event ?? null;
   const forceSeries = useMemo(
     () => [0, 1, 2].map((axis) => history.map((point) => point.interaction_force[axis])),
     [history]
@@ -155,6 +158,14 @@ function App() {
         <Metric label="患者主动功率" value={`${(telemetry?.human_power_w ?? 0).toFixed(3)} W`} detail={`疲劳 ${(telemetry?.fatigue ?? 0).toFixed(0)}%`} />
       </section>
 
+      <section className={`agent-banner card severity-${agentEvent?.severity ?? "info"}`}>
+        <div className="agent-mark">AI</div>
+        <div>
+          <p className="agent-label">规则式训练提示 · {agentEvent?.event ?? "waiting"}</p>
+          <strong>{agentEvent?.message ?? "开始训练后，这里会显示基于运动状态的训练提示。"}</strong>
+        </div>
+      </section>
+
       <section className="dashboard-grid">
         <Panel title="实时轨迹" subtitle="任务空间 [x, y]"><TrajectoryChart points={history} /></Panel>
         <Panel title="交互力曲线" subtitle="Fx / Fy / Tz"><LineChart values={forceSeries} colors={["#2e7dce", "#eb8a44", "#8a63d2"]} labels={["Fx", "Fy", "Tz"]} /></Panel>
@@ -171,14 +182,17 @@ function App() {
 
       <section className="card report-card">
         <div className="panel-heading"><div><h2>训练摘要</h2><p>会话结束后生成的可追溯指标</p></div><span className="session-id">{snapshot.session_id}</span></div>
-        {snapshot.report ? <div className="report-grid">
+        {snapshot.report ? <>
+          {snapshot.agent_summary && <div className="agent-summary"><strong>{snapshot.agent_summary.message}</strong><span>{snapshot.agent_summary.recommendation}</span><small>{snapshot.agent_summary.highlights.join(" · ")}</small></div>}
+          <div className="report-grid">
           <ReportItem label="完成率" value={`${(snapshot.report.completion_rate * 100).toFixed(0)}%`} />
           <ReportItem label="平均轨迹误差" value={snapshot.report.average_tracking_error.toFixed(4)} />
           <ReportItem label="峰值交互力" value={`${snapshot.report.peak_interaction_force.toFixed(4)} N`} />
           <ReportItem label="运动平滑度" value={snapshot.report.motion_smoothness.toFixed(4)} />
           <ReportItem label="患者主动做功" value={`${snapshot.report.patient_active_work.toFixed(4)} J`} />
           <ReportItem label="机器人辅助做功" value={`${snapshot.report.robot_assistance_work.toFixed(4)} J`} />
-        </div> : <div className="empty-report">完成一次训练后，这里会显示训练摘要。</div>}
+          </div>
+        </> : <div className="empty-report">完成一次训练后，这里会显示训练摘要。</div>}
       </section>
       <footer>Phase 7 simulation interface · RL does not publish motor or joint commands · {config?.hardware_validation_required ? "hardware validation required" : "simulation"}</footer>
     </main>

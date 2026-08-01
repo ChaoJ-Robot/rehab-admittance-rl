@@ -29,11 +29,12 @@ def test_phase7_rest_controls_and_report() -> None:
                 "task": "point_to_point",
                 "patient_profile": "moderate",
                 "mode": "fixed",
-                "duration_s": 0.2,
+                "duration_s": 2.0,
             },
         )
         assert started.status_code == 200
         assert started.json()["state"] == "running"
+        assert started.json()["agent_event"]["event"] == "task_started"
 
         paused = client.post("/api/session/pause")
         assert paused.status_code == 200
@@ -52,6 +53,9 @@ def test_phase7_rest_controls_and_report() -> None:
         report = client.get("/api/report")
         assert report.status_code == 200
         assert "average_tracking_error" in report.json()
+        events = client.get("/api/agent/events")
+        assert events.status_code == 200
+        assert events.json()[0]["event"] == "task_started"
 
 
 def test_phase7_websocket_streams_telemetry() -> None:
@@ -76,6 +80,7 @@ def test_phase7_websocket_streams_telemetry() -> None:
         assert first["data"]["telemetry"] is not None
         assert second["data"]["telemetry"] is not None
         assert second["data"]["telemetry"]["timestamp"] >= first["data"]["telemetry"]["timestamp"]
+        assert first["data"]["agent_event"] is not None
 
 
 def test_phase7_completed_session_generates_summary() -> None:
@@ -96,3 +101,29 @@ def test_phase7_completed_session_generates_summary() -> None:
         assert current.status_code == 200
         assert current.json()["state"] == "completed"
         assert current.json()["report"]["completed"] is True
+        assert current.json()["agent_summary"]["title"] == "训练总结"
+
+
+def test_agent_failure_does_not_stop_telemetry_or_control() -> None:
+    app = create_app()
+
+    def broken_observe(*_: object, **__: object) -> None:
+        raise RuntimeError("agent unavailable")
+
+    app.state.session._agent.observe = broken_observe  # type: ignore[method-assign]
+    with TestClient(app) as client:
+        started = client.post(
+            "/api/session/start",
+            json={
+                "task": "point_to_point",
+                "patient_profile": "moderate",
+                "mode": "fixed",
+                "duration_s": 2.0,
+            },
+        )
+        assert started.status_code == 200
+        time.sleep(0.08)
+        current = client.get("/api/session").json()
+        assert current["telemetry"] is not None
+        assert current["telemetry"]["safety_status"] == "safe"
+        client.post("/api/session/stop")
