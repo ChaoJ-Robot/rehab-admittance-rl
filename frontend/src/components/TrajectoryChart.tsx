@@ -30,8 +30,14 @@ export function TrajectoryChart({ points }: TrajectoryChartProps) {
     <div className="chart-wrap">
       <svg className="trajectory-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="trajectory chart">
         <rect x="0" y="0" width={width} height={height} rx="12" className="chart-background" />
+        {[0.25, 0.5, 0.75].map((ratio) => <g key={ratio}>
+          <line x1={width * ratio} x2={width * ratio} y1="0" y2={height} className="trajectory-grid" />
+          <line x1="0" x2={width} y1={height * ratio} y2={height * ratio} className="trajectory-grid" />
+        </g>)}
         <polyline points={path("reference_pose")} className="reference-path" />
         <polyline points={path("actual_pose")} className="actual-path" />
+        {points.length > 0 && <circle cx={project(points[points.length - 1].actual_pose[0], points[points.length - 1].actual_pose[1])[0]} cy={project(points[points.length - 1].actual_pose[0], points[points.length - 1].actual_pose[1])[1]} r="5" className="trajectory-endpoint" />}
+        {points.length === 0 && <g className="chart-empty"><circle cx={width / 2} cy={height / 2 - 8} r="18" /><path d={`M ${width / 2 - 6} ${height / 2 - 8} h 12 M ${width / 2} ${height / 2 - 14} v 12`} /><text x={width / 2} y={height / 2 + 28} textAnchor="middle">WAITING FOR TRAJECTORY</text></g>}
       </svg>
       <div className="chart-legend">
         <span><i className="legend-reference" />参考轨迹</span>
