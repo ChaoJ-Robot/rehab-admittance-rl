@@ -1,8 +1,8 @@
 <div align="center">
 
-# 基于安全强化学习与交互 Agent 的上肢康复机器人自适应导纳训练系统
+# 基于强化学习与交互 Agent 的上肢康复机器人自适应导纳训练系统
 
-**Safe RL-Driven Adaptive Admittance Training System with an LLM Interaction Agent**
+** RL-Driven Adaptive Admittance Training System with an LLM Interaction Agent**
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)
 ![RL](https://img.shields.io/badge/RL-SAC%20%7C%20PPO-orange)
