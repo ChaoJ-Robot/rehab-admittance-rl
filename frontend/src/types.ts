@@ -1,4 +1,9 @@
-export type TaskName = "point_to_point" | "circle_tracking" | "figure8_tracking";
+export type TaskName =
+  | "point_to_point"
+  | "circle_tracking"
+  | "figure8_tracking"
+  | "maze_navigation"
+  | "color_memory";
 export type PatientProfile = "mild" | "moderate" | "severe";
 export type ControlMode = "fixed" | "rl";
 export type SessionState = "idle" | "running" | "paused" | "completed" | "stopped";
@@ -24,6 +29,11 @@ export interface Telemetry {
   safety_status: "safe" | "fallback" | "paused" | "idle";
   safety_reasons: string[];
   agent_event: AgentEvent | null;
+  maze_walls: number[][];
+  color_block_positions: number[][];
+  color_block_names: string[];
+  color_sequence: string[];
+  task_phase: "memorize" | "recall" | null;
 }
 
 export interface AgentEvent {

@@ -16,3 +16,10 @@ tasks:
     reference_speed: 0.10       # m/s
     path_width_tolerance: 0.03  # m
     task_duration: 8.0          # s
+  maze_navigation:
+    reference_speed: 0.14       # m/s along the maze corridor path
+    task_duration: 8.0          # s
+  color_memory:
+    sequence_length: 4          # number of colour blocks to memorise
+    memorize_duration: 3.0      # s of the memorise phase
+    task_duration: 10.0         # s

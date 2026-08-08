@@ -1,6 +1,8 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { LineChart } from "./components/LineChart";
 import { TrajectoryChart } from "./components/TrajectoryChart";
+import { MazeChart } from "./components/MazeChart";
+import { ColorMemoryPanel } from "./components/ColorMemoryPanel";
 import {
   chatWithAgent,
   getConfig,
@@ -25,7 +27,17 @@ import "./styles.css";
 const taskLabels: Record<TaskName, string> = {
   point_to_point: "点到点训练",
   circle_tracking: "圆轨迹训练",
-  figure8_tracking: "八字轨迹训练"
+  figure8_tracking: "八字轨迹训练",
+  maze_navigation: "迷宫导航",
+  color_memory: "色块记忆"
+};
+
+const taskMeta: Record<TaskName, { icon: string; category: string; desc: string; level: string }> = {
+  point_to_point: { icon: "⌁", category: "轨迹跟踪", desc: "从起点平稳移动至目标点，训练运动启动与定位控制能力。", level: "基础" },
+  circle_tracking: { icon: "◍", category: "轨迹跟踪", desc: "沿圆形参考轨迹连续运动，训练节律性与速度适应能力。", level: "进阶" },
+  figure8_tracking: { icon: "∞", category: "轨迹跟踪", desc: "沿八字轨迹换向跟踪，训练方向切换与协调控制。", level: "进阶" },
+  maze_navigation: { icon: "▦", category: "空间导航", desc: "引导末端穿越 S 形迷宫走廊，训练空间规划与运动协调能力。", level: "挑战" },
+  color_memory: { icon: "▩", category: "认知训练", desc: "记忆颜色序列并按顺序复述，记忆与运动的双任务训练。", level: "挑战" }
 };
 
 const patientLabels: Record<PatientProfile, string> = {
@@ -63,6 +75,7 @@ function App() {
   const [config, setConfig] = useState<ConfigSummary | null>(null);
   const [snapshot, setSnapshot] = useState<SessionSnapshot>(initialSnapshot);
   const [history, setHistory] = useState<Telemetry[]>([]);
+  const [view, setView] = useState<"home" | "training">("home");
   const [task, setTask] = useState<TaskName>("point_to_point");
   const [patient, setPatient] = useState<PatientProfile>("moderate");
   const [mode, setModeValue] = useState<ControlMode>("fixed");
@@ -77,6 +90,9 @@ function App() {
         setConfig(loadedConfig);
         setSnapshot(loadedSession);
         setModeValue(loadedSession.mode);
+        if (loadedSession.state === "running" || loadedSession.state === "paused") {
+          setView("training");
+        }
       })
       .catch((reason: unknown) => setError(String(reason)));
 
@@ -85,6 +101,7 @@ function App() {
     socket.onmessage = (event) => {
       const message = JSON.parse(event.data) as { type: string; data: SessionSnapshot };
       if (message.type !== "telemetry") return;
+      setError((previous) => (previous && previous.includes("WebSocket") ? null : previous));
       setSnapshot(message.data);
       if (message.data.telemetry) {
         setHistory((previous) => [...previous, message.data.telemetry as Telemetry].slice(-240));
@@ -100,9 +117,16 @@ function App() {
       const next = await operation();
       setSnapshot(next);
       if (next.state === "running" && next.elapsed_s === 0) setHistory([]);
+      return next;
     } catch (reason) {
       setError(String(reason));
+      return null;
     }
+  };
+
+  const handleStart = async () => {
+    const next = await runRequest(() => startSession(task, patient, mode));
+    if (next) setView("training");
   };
 
   const sendChat = async () => {
@@ -130,6 +154,16 @@ function App() {
 
   const telemetry = snapshot.telemetry;
   const agentEvent = snapshot.agent_event ?? telemetry?.agent_event ?? null;
+  const running = snapshot.state === "running";
+  const paused = snapshot.state === "paused";
+  const finished = snapshot.state === "completed" || snapshot.state === "stopped";
+  const safetyStatus = telemetry?.safety_status ?? "idle";
+  const safetyLabel =
+    safetyStatus === "fallback" ? "保护回退" : safetyStatus === "safe" ? "系统安全" : "等待遥测";
+  const connectionLabel = error ? "连接异常" : telemetry ? "实时连接" : "等待连接";
+  const forceMagnitude = Math.hypot(telemetry?.interaction_force[0] ?? 0, telemetry?.interaction_force[1] ?? 0);
+  const modeLabel = snapshot.mode === "rl" ? "RL 参数调节" : "固定导纳";
+  const progressPercent = Math.round(snapshot.task_progress * 100);
   const forceSeries = useMemo(
     () => [0, 1, 2].map((axis) => history.map((point) => point.interaction_force[axis])),
     [history]
@@ -138,191 +172,227 @@ function App() {
     () => [0, 1, 2, 3, 4].map((axis) => history.map((point) => point.admittance_parameters[axis])),
     [history]
   );
-  const progressPercent = Math.round(snapshot.task_progress * 100);
-  const running = snapshot.state === "running";
-  const paused = snapshot.state === "paused";
-  const safetyStatus = telemetry?.safety_status ?? "idle";
-  const safetyLabel = safetyStatus === "fallback" ? "保护回退" : safetyStatus === "safe" ? "系统安全" : "等待遥测";
-  const connectionLabel = error ? "连接异常" : telemetry ? "实时连接" : "等待连接";
-  const forceMagnitude = Math.hypot(telemetry?.interaction_force[0] ?? 0, telemetry?.interaction_force[1] ?? 0);
-  const modeLabel = snapshot.mode === "rl" ? "RL 参数调节" : "固定导纳";
+
+  const topbar = (
+    <header className="topbar">
+      <div className="brand-lockup">
+        <div className="brand-emblem"><span>R</span><i /></div>
+        <div>
+          <p className="eyebrow"><span className="eyebrow-line" /> REHAB / INTELLIGENCE SYSTEM</p>
+          <h1>上肢康复训练<span>控制台</span></h1>
+        </div>
+      </div>
+      <div className="topbar-actions">
+        <div className="connection-chip">
+          <span className={`status-dot ${telemetry ? safetyStatus : "idle"}`} />
+          <span>{connectionLabel}</span>
+          <small>20 Hz</small>
+        </div>
+        <div className="simulation-tag"><span className="shield-mark">◆</span> SIMULATION ONLY</div>
+      </div>
+    </header>
+  );
+
+  if (view === "home") {
+    const tasks = config?.tasks ?? (Object.keys(taskLabels) as TaskName[]);
+    return (
+      <main className="app-shell">
+        <div className="ambient ambient-one" />
+        <div className="ambient ambient-two" />
+        {topbar}
+        {error && <div className="error-banner"><span className="alert-icon">!</span><span>{error}</span></div>}
+
+        <div className="home-layout">
+          <section className="home-hero">
+            <div className="live-label"><span className="live-pulse" /> TRAINING TASK LIBRARY</div>
+            <h2>选择一项训练任务<em>，开始今天的康复。</em></h2>
+            <p>覆盖轨迹跟踪、空间导航与认知双任务训练；安全强化学习实时调节导纳参数，智能教练全程陪伴。</p>
+          </section>
+
+          <section className="task-grid">
+            {tasks.map((name) => {
+              const meta = taskMeta[name];
+              return (
+                <button
+                  key={name}
+                  className={`task-card ${task === name ? "selected" : ""}`}
+                  onClick={() => setTask(name)}
+                >
+                  <div className="task-card-top">
+                    <span className="task-icon">{meta.icon}</span>
+                    <span className="task-category">{meta.category}</span>
+                    <span className={`task-level level-${meta.level}`}>{meta.level}</span>
+                  </div>
+                  <strong>{taskLabels[name]}</strong>
+                  <p>{meta.desc}</p>
+                  <span className="task-check">{task === name ? "● 已选择" : "○ 点击选择"}</span>
+                </button>
+              );
+            })}
+          </section>
+
+          <section className="home-controls card">
+            <div className="home-control-fields">
+              <div className="control-field">
+                <label>患者配置</label>
+                <select value={patient} onChange={(event) => setPatient(event.target.value as PatientProfile)}>
+                  {(config?.patient_profiles ?? ["moderate"]).map((item) => (
+                    <option key={item} value={item}>{patientLabels[item]}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="control-field">
+                <label>控制模式</label>
+                <select value={mode} onChange={(event) => { const next = event.target.value as ControlMode; setModeValue(next); void runRequest(() => setMode(next)); }}>
+                  <option value="fixed">固定导纳</option>
+                  <option value="rl">RL 参数调节</option>
+                </select>
+              </div>
+              <div className="home-task-brief">
+                <span className="brief-label">当前任务</span>
+                <strong>{taskMeta[task].icon} {taskLabels[task]}</strong>
+                <small>{taskMeta[task].category} · {taskMeta[task].level}</small>
+              </div>
+            </div>
+            <button className="primary start-button" onClick={() => void handleStart()}>
+              <span>▶</span> 开始训练
+            </button>
+          </section>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="app-shell">
       <div className="ambient ambient-one" />
       <div className="ambient ambient-two" />
-
-      <header className="topbar">
-        <div className="brand-lockup">
-          <div className="brand-emblem"><span>R</span><i /></div>
-          <div>
-            <p className="eyebrow"><span className="eyebrow-line" /> REHAB / INTELLIGENCE SYSTEM</p>
-            <h1>上肢康复训练<span>控制台</span></h1>
-          </div>
-        </div>
-        <div className="topbar-actions">
-          <div className="connection-chip">
-            <span className={`status-dot ${telemetry ? safetyStatus : "idle"}`} />
-            <span>{connectionLabel}</span>
-            <small>20 Hz</small>
-          </div>
-          <div className="simulation-tag"><span className="shield-mark">◆</span> SIMULATION ONLY</div>
-          <div className="avatar-mark">3D</div>
-        </div>
-      </header>
-
+      {topbar}
       {error && <div className="error-banner"><span className="alert-icon">!</span><span>{error}</span></div>}
 
-      <section className="hero card">
-        <div className="hero-copy">
-          <div className="live-label"><span className="live-pulse" /> LIVE SESSION MONITOR</div>
-          <h2>让每一次训练，都变得<br /><em>更安全、更主动。</em></h2>
-          <p>基于安全强化学习与交互 Agent 的平面三自由度上肢康复训练系统，实时感知轨迹、交互力与患者主动参与度。</p>
-          <div className="hero-pills">
-            <span><b>01</b> 任务空间控制</span>
-            <span><b>02</b> 独立安全监督</span>
-            <span><b>03</b> 患者状态反馈</span>
-          </div>
-        </div>
-        <div className="hero-visual" aria-hidden="true">
-          <div className="radar-ring ring-large" />
-          <div className="radar-ring ring-small" />
-          <div className="radar-sweep" />
-          <div className="robot-orb"><span>3</span><small>DOF</small></div>
-          <div className="orbit-tag orbit-top">X / Y <b>▰</b></div>
-          <div className="orbit-tag orbit-right">SAFE <b>✓</b></div>
-          <div className="orbit-tag orbit-bottom">RL <b>↗</b></div>
-          <div className="orbit-node node-one" /><div className="orbit-node node-two" /><div className="orbit-node node-three" />
-        </div>
-      </section>
-
-      <section className="control-card card">
-        <div className="section-identity">
-          <span className="section-number">01</span>
-          <div><strong>配置训练会话</strong><small>SESSION CONFIGURATION</small></div>
-        </div>
-        <div className="control-fields">
-          <ControlField label="训练任务" icon="⌁">
-            <select id="task" value={task} onChange={(event) => setTask(event.target.value as TaskName)} disabled={running || paused}>
-              {(config?.tasks ?? ["point_to_point"]).map((item) => <option key={item} value={item}>{taskLabels[item]}</option>)}
-            </select>
-          </ControlField>
-          <ControlField label="患者配置" icon="◉">
-            <select id="patient" value={patient} onChange={(event) => setPatient(event.target.value as PatientProfile)} disabled={running || paused}>
-              {(config?.patient_profiles ?? ["moderate"]).map((item) => <option key={item} value={item}>{patientLabels[item]}</option>)}
-            </select>
-          </ControlField>
-          <ControlField label="控制模式" icon="ϟ">
-            <select id="mode" value={mode} onChange={(event) => { const next = event.target.value as ControlMode; setModeValue(next); void runRequest(() => setMode(next)); }}>
-              <option value="fixed">固定导纳</option>
-              <option value="rl">RL 参数调节</option>
-            </select>
-          </ControlField>
-        </div>
-        <div className="button-row">
-          {!running && !paused && <button className="primary action-button" onClick={() => void runRequest(() => startSession(task, patient, mode))}><span>▶</span> 开始训练</button>}
-          {running && <button className="action-button pause-button" onClick={() => void runRequest(pauseSession)}><span>Ⅱ</span> 暂停</button>}
-          {paused && <button className="primary action-button" onClick={() => void runRequest(resumeSession)}><span>▶</span> 继续训练</button>}
-          {(running || paused) && <button className="danger action-button" onClick={() => void runRequest(stopSession)}><span>■</span> 停止</button>}
-        </div>
-      </section>
-
-      <section className="metric-grid">
-        <Metric icon="◒" accent="cyan" label="任务进度" value={`${progressPercent}%`} detail={`${snapshot.elapsed_s.toFixed(1)} / ${snapshot.duration_s.toFixed(1)} s`} progress={snapshot.task_progress} />
-        <Metric icon="✦" accent="violet" label="当前得分" value={snapshot.score.toFixed(2)} detail={taskLabels[snapshot.task]} />
-        <Metric icon="≋" accent="orange" label="交互力幅值" value={`${forceMagnitude.toFixed(3)} N`} detail="Fx / Fy / Tz" />
-        <Metric icon="♧" accent="green" label="患者主动功率" value={`${(telemetry?.human_power_w ?? 0).toFixed(3)} W`} detail={`疲劳 ${(telemetry?.fatigue ?? 0).toFixed(0)}%`} progress={telemetry?.fatigue ? 1 - telemetry.fatigue : 1} />
-      </section>
-
-      <section className={`agent-banner card severity-${agentEvent?.severity ?? "info"}`}>
-        <div className="agent-mark"><span>AI</span><i /></div>
-        <div className="agent-message"><p className="agent-label"><span>INTERACTION AGENT</span> / {agentEvent?.event ?? "SYSTEM STANDBY"}</p><strong>{agentEvent?.message ?? "开始训练后，这里会显示基于运动状态的训练提示。"}</strong></div>
-        <div className="agent-side"><span className="agent-side-dot" />只读反馈模式</div>
-      </section>
-      
-      <section className="card agent-chat-card">
-        <div className="panel-heading">
-          <div><div className="section-kicker">LLM INTERACTION</div><h2>智能教练</h2><p>根据患者表现生成个性化反馈与总结，可随时提问</p></div>
-          <span className="panel-badge">DeepSeek</span>
-        </div>
-        <div className="chat-feed" ref={chatFeedRef}>
-          {chatFeed.length === 0 ? (
-            <div className="chat-empty"><div className="empty-icon">✦</div><div><strong>对话尚未开始</strong><span>开始训练后，规则事件与 LLM 反馈会出现在这里；训练结束后可向智能教练提问。</span></div></div>
-          ) : chatFeed.map((item: AgentChatMessage, index: number) => (
-            <div className={`chat-message ${item.role} source-${item.source}`} key={`${item.timestamp_s}-${index}`}>
-              <span className="chat-avatar">{item.role === "user" ? "你" : "AI"}</span>
-              <div className="chat-bubble-wrap"><span className="chat-bubble">{item.message}</span><small>{item.source === "llm" ? "LLM 生成" : item.source === "rules" ? "规则反馈" : "患者 / 治疗师"}</small></div>
+      <div className="training-layout">
+        <section className="training-main">
+          <div className="training-status-row">
+            <button className="ghost-button" onClick={() => finished && setView("home")} disabled={!finished}>
+              ← 返回{finished ? "" : "（训练结束后）"}
+            </button>
+            <div className="session-brief">
+              <strong>{taskMeta[snapshot.task].icon} {taskLabels[snapshot.task]}</strong>
+              <span>{patientLabels[snapshot.patient_profile]} · {modeLabel} · {stateLabels[snapshot.state]}</span>
             </div>
-          ))}
-        </div>
-        <div className="chat-input-row">
-          <input
-            value={chatInput}
-            onChange={(event) => setChatInput(event.target.value)}
-            onKeyDown={(event) => { if (event.key === "Enter") void sendChat(); }}
-            placeholder="问问智能教练，例如：今天练得怎么样？"
-            disabled={chatSending}
-          />
-          <button className="primary action-button" onClick={() => void sendChat()} disabled={chatSending}><span>➤</span> {chatSending ? "思考中" : "发送"}</button>
-        </div>
-      </section>
-      
-      <section className="dashboard-grid">
-        <Panel className="trajectory-panel" title="实时轨迹" subtitle="TASK SPACE / [ X, Y ]" badge={`${history.length} SAMPLES`}><TrajectoryChart points={history} /></Panel>
-        <Panel title="交互力曲线" subtitle="FORCE TELEMETRY / [ Fx, Fy, Tz ]" badge={telemetry ? "LIVE" : "STANDBY"}><LineChart values={forceSeries} colors={["#4ed7ee", "#ffac63", "#a98aff"]} labels={["Fx", "Fy", "Tz"]} /></Panel>
-        <Panel title="导纳参数" subtitle="ADMITTANCE / LOW-FREQUENCY UPDATE" badge={modeLabel}><LineChart values={parameterSeries} colors={["#4ed7ee", "#5ee7a4", "#ffac63", "#a98aff", "#f27caa"]} labels={["Dx", "Dy", "Dθ", "Ka", "λv"]} /></Panel>
-        <Panel className="status-panel" title="当前状态" subtitle="SYSTEM TELEMETRY / 20 HZ" badge={safetyLabel}>
-          <div className="status-hero">
-            <div className={`safety-orb ${safetyStatus}`}><span>{safetyStatus === "fallback" ? "!" : "✓"}</span></div>
-            <div><small>SAFETY STATUS</small><strong>{safetyLabel}</strong><em>{snapshot.state === "running" ? "系统正在持续监测" : "等待下一次训练会话"}</em></div>
+            <div className={`safety-chip ${safetyStatus}`}>
+              <span className="status-dot" />{safetyLabel}
+            </div>
+            <div className="session-buttons">
+              {running && <button className="action-button pause-button" onClick={() => void runRequest(pauseSession)}>Ⅱ 暂停</button>}
+              {paused && <button className="primary action-button" onClick={() => void runRequest(resumeSession)}>▶ 继续</button>}
+              {(running || paused) && <button className="danger action-button" onClick={() => void runRequest(stopSession)}>■ 停止</button>}
+            </div>
           </div>
-          <div className="state-list">
-            <StateRow label="会话状态" value={stateLabels[snapshot.state]} tone={running ? "active" : "normal"} />
-            <StateRow label="控制模式" value={modeLabel} />
-            <StateRow label="当前位置" value={telemetry ? `[${telemetry.actual_pose.map((value) => value.toFixed(3)).join(", ")}]` : "等待数据"} />
-            <StateRow label="当前动作" value={telemetry ? `[${telemetry.rl_action.map((value) => value.toFixed(2)).join(", ")}]` : "[0, 0, 0, 0]"} />
-          </div>
-        </Panel>
-      </section>
 
-      <section className="card report-card">
-        <div className="panel-heading"><div><div className="section-kicker">SESSION REPORT</div><h2>训练摘要</h2><p>会话结束后生成的可追溯指标</p></div><span className="session-id">ID / {snapshot.session_id}</span></div>
-        {snapshot.report ? <>
-          {snapshot.agent_summary && <div className="agent-summary"><div className="summary-icon">✦</div><div><strong>{snapshot.agent_summary.message}</strong><span>{snapshot.agent_summary.recommendation}</span><small>{snapshot.agent_summary.highlights.join(" · ")}</small></div></div>}
-          <div className="report-grid">
-            <ReportItem label="完成率" value={`${(snapshot.report.completion_rate * 100).toFixed(0)}%`} />
-            <ReportItem label="平均轨迹误差" value={snapshot.report.average_tracking_error.toFixed(4)} />
-            <ReportItem label="峰值交互力" value={`${snapshot.report.peak_interaction_force.toFixed(4)} N`} />
-            <ReportItem label="运动平滑度" value={snapshot.report.motion_smoothness.toFixed(4)} />
-            <ReportItem label="患者主动做功" value={`${snapshot.report.patient_active_work.toFixed(4)} J`} />
-            <ReportItem label="机器人辅助做功" value={`${snapshot.report.robot_assistance_work.toFixed(4)} J`} />
+          <div className="metric-row">
+            <Metric compact icon="◒" accent="cyan" label="任务进度" value={`${progressPercent}%`} progress={snapshot.task_progress} />
+            <Metric compact icon="✦" accent="violet" label="当前得分" value={snapshot.score.toFixed(2)} />
+            <Metric compact icon="≋" accent="orange" label="交互力幅值" value={`${forceMagnitude.toFixed(3)} N`} />
+            <Metric compact icon="♧" accent="green" label="疲劳估计" value={`${((telemetry?.fatigue ?? 0) * 100).toFixed(0)}%`} progress={telemetry ? 1 - telemetry.fatigue : 1} />
           </div>
-        </> : <div className="empty-report"><div className="empty-icon">⌁</div><div><strong>暂无训练摘要</strong><span>完成一次训练后，这里会显示训练质量和安全指标。</span></div></div>}
-      </section>
 
-      <footer><span className="footer-brand"><b>R</b> REHAB INTELLIGENCE</span><span>Phase 7 simulation interface</span><span>RL does not publish motor or joint commands</span><span className="footer-validation">● {config?.hardware_validation_required ? "HARDWARE VALIDATION REQUIRED" : "SIMULATION"}</span></footer>
+          <div className="chart-grid">
+            <Panel className="main-viz-panel" title={taskLabels[snapshot.task]} subtitle="TASK VISUALIZATION" badge={`${history.length} SAMPLES`}>
+              {snapshot.task === "maze_navigation" ? <MazeChart points={history} />
+                : snapshot.task === "color_memory" ? <ColorMemoryPanel points={history} />
+                : <TrajectoryChart points={history} />}
+              {agentEvent && (
+                <div className={`inline-agent-banner severity-${agentEvent.severity}`}>
+                  <span className="agent-tag">AI</span>
+                  <span className="inline-agent-message">{agentEvent.message}</span>
+                </div>
+              )}
+            </Panel>
+            <Panel title="交互力曲线" subtitle="Fx / Fy / Tz" badge={telemetry ? "LIVE" : "STANDBY"}>
+              <LineChart values={forceSeries} height={108} colors={["#4ed7ee", "#ffac63", "#a98aff"]} labels={["Fx", "Fy", "Tz"]} />
+            </Panel>
+            <Panel title="导纳参数" subtitle="LOW-FREQ UPDATE" badge={modeLabel}>
+              <LineChart values={parameterSeries} height={108} colors={["#4ed7ee", "#5ee7a4", "#ffac63", "#a98aff", "#f27caa"]} labels={["Dx", "Dy", "Dθ", "Ka", "λv"]} />
+            </Panel>
+          </div>
+
+          {snapshot.report && snapshot.agent_summary && (
+            <div className="summary-banner card">
+              <div className="summary-icon">✦</div>
+              <div className="summary-body">
+                <strong>{snapshot.agent_summary.message}</strong>
+                <span>{snapshot.agent_summary.recommendation}</span>
+                <small>{snapshot.agent_summary.highlights.join(" · ")} · 来源：{snapshot.agent_summary.source === "llm" ? "LLM 生成" : "规则模板"}</small>
+              </div>
+              <button className="primary action-button" onClick={() => { void runRequest(stopSession); setView("home"); }}>完成并返回</button>
+            </div>
+          )}
+        </section>
+
+        <aside className="chat-panel card">
+          <div className="chat-header">
+            <div>
+              <div className="section-kicker">LLM INTERACTION</div>
+              <h2>智能教练</h2>
+            </div>
+            <span className="panel-badge">DeepSeek</span>
+          </div>
+          <div className="chat-feed" ref={chatFeedRef}>
+            {chatFeed.length === 0 ? (
+              <div className="chat-empty"><div className="empty-icon">✦</div><div><strong>对话尚未开始</strong><span>训练提示与 LLM 反馈会出现在这里，可随时向教练提问。</span></div></div>
+            ) : chatFeed.map((item: AgentChatMessage, index: number) => (
+              <div className={`chat-message ${item.role} source-${item.source}`} key={`${item.timestamp_s}-${index}`}>
+                <span className="chat-avatar">{item.role === "user" ? "你" : "AI"}</span>
+                <div className="chat-bubble-wrap">
+                  <span className="chat-bubble">{item.message}</span>
+                  <small>{item.source === "llm" ? "LLM 生成" : item.source === "rules" ? "规则反馈" : "患者 / 治疗师"}</small>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="chat-input-row">
+            <input
+              value={chatInput}
+              onChange={(event) => setChatInput(event.target.value)}
+              onKeyDown={(event) => { if (event.key === "Enter") void sendChat(); }}
+              placeholder="问问智能教练，例如：今天练得怎么样？"
+              disabled={chatSending}
+            />
+            <button className="primary chat-send-button" onClick={() => void sendChat()} disabled={chatSending}>
+              ➤ {chatSending ? "思考中" : "发送"}
+            </button>
+          </div>
+        </aside>
+      </div>
     </main>
   );
 }
 
-function ControlField({ label, icon, children }: { label: string; icon: string; children: ReactNode }) {
-  return <div className="control-field"><label><span className="field-icon">{icon}</span>{label}</label>{children}</div>;
-}
-
-function Metric({ icon, accent, label, value, detail, progress }: { icon: string; accent: string; label: string; value: string; detail: string; progress?: number }) {
-  return <div className={`metric-card card accent-${accent}`}><div className="metric-top"><span className="metric-icon">{icon}</span><span className="metric-label">{label}</span><span className="metric-live">LIVE</span></div><strong>{value}</strong><small>{detail}</small>{progress !== undefined && <div className="progress-track"><div style={{ width: `${progress * 100}%` }} /></div>}</div>;
+function Metric({ icon, accent, label, value, progress, compact = false }: { icon: string; accent: string; label: string; value: string; progress?: number; compact?: boolean }) {
+  return (
+    <div className={`metric-card card accent-${accent} ${compact ? "metric-compact" : ""}`}>
+      <div className="metric-top">
+        <span className="metric-icon">{icon}</span>
+        <span className="metric-label">{label}</span>
+        <span className="metric-live">LIVE</span>
+      </div>
+      <strong>{value}</strong>
+      {progress !== undefined && <div className="progress-track"><div style={{ width: `${progress * 100}%` }} /></div>}
+    </div>
+  );
 }
 
 function Panel({ title, subtitle, badge, className = "", children }: { title: string; subtitle: string; badge?: string; className?: string; children: ReactNode }) {
-  return <div className={`card panel ${className}`}><div className="panel-heading"><div><div className="section-kicker">{subtitle}</div><h2>{title}</h2></div>{badge && <span className="panel-badge">{badge}</span>}</div>{children}</div>;
-}
-
-function StateRow({ label, value, tone = "normal" }: { label: string; value: string; tone?: "normal" | "active" | "warning" }) {
-  return <div className="state-row"><span>{label}</span><strong className={`tone-${tone}`}>{tone === "active" && <i />} {value}</strong></div>;
-}
-
-function ReportItem({ label, value }: { label: string; value: string }) {
-  return <div><span>{label}</span><strong>{value}</strong></div>;
+  return (
+    <div className={`card panel ${className}`}>
+      <div className="panel-heading">
+        <div><div className="section-kicker">{subtitle}</div><h2>{title}</h2></div>
+        {badge && <span className="panel-badge">{badge}</span>}
+      </div>
+      {children}
+    </div>
+  );
 }
 
 export default App;

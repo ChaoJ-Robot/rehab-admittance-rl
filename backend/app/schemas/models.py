@@ -6,7 +6,13 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-TaskName = Literal["point_to_point", "circle_tracking", "figure8_tracking"]
+TaskName = Literal[
+    "point_to_point",
+    "circle_tracking",
+    "figure8_tracking",
+    "maze_navigation",
+    "color_memory",
+]
 PatientProfile = Literal["mild", "moderate", "severe"]
 ControlMode = Literal["fixed", "rl"]
 SessionState = Literal["idle", "running", "paused", "completed", "stopped"]
@@ -86,6 +92,11 @@ class Telemetry(BaseModel):
     safety_status: Literal["safe", "fallback", "paused", "idle"]
     safety_reasons: list[str]
     agent_event: AgentEventPayload | None = None
+    maze_walls: list[list[float]] = Field(default_factory=list)
+    color_block_positions: list[list[float]] = Field(default_factory=list)
+    color_block_names: list[str] = Field(default_factory=list)
+    color_sequence: list[str] = Field(default_factory=list)
+    task_phase: Literal["memorize", "recall"] | None = None
 
 
 class TrainingReport(BaseModel):

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 import time
 import uuid
 from collections import deque
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -64,6 +66,84 @@ class _LLMTask:
     events: list[AgentEvent] | None = None
 
 
+COLOR_BLOCK_NAMES: tuple[str, ...] = ("red", "blue", "green", "yellow")
+COLOR_BLOCK_POSITIONS: tuple[tuple[float, float, float], ...] = (
+    (0.48, 0.14, 0.0),
+    (0.48, -0.14, 0.0),
+    (0.24, 0.14, 0.0),
+    (0.24, -0.14, 0.0),
+)
+
+
+class _PathFollow:
+    """Piecewise-linear waypoint path traversed at constant speed (maze task)."""
+
+    def __init__(self, waypoints: Sequence[Sequence[float]], speed: float) -> None:
+        points = np.asarray(waypoints, dtype=np.float64)
+        self._points = points
+        segments = np.linalg.norm(np.diff(points, axis=0), axis=1)
+        self._cumulative = np.concatenate([[0.0], np.cumsum(segments)])
+        self._total = float(self._cumulative[-1])
+        self._speed = float(speed)
+
+    def reference(self, time_s: float) -> tuple[np.ndarray, np.ndarray]:
+        distance = min(self._speed * max(time_s, 0.0), self._total)
+        index = int(
+            np.clip(
+                np.searchsorted(self._cumulative, distance, side="right") - 1,
+                0,
+                len(self._points) - 2,
+            )
+        )
+        segment_length = float(self._cumulative[index + 1] - self._cumulative[index])
+        fraction = (distance - float(self._cumulative[index])) / max(segment_length, 1e-9)
+        position = self._points[index] + fraction * (self._points[index + 1] - self._points[index])
+        direction = (self._points[index + 1] - self._points[index]) / max(segment_length, 1e-9)
+        velocity = (
+            direction * self._speed if distance < self._total else np.zeros(3, dtype=np.float64)
+        )
+        return position, velocity
+
+    def progress(self, time_s: float) -> float:
+        return float(min(1.0, self._speed * max(time_s, 0.0) / max(self._total, 1e-6)))
+
+
+class _ColorMemoryPlan:
+    """Memorise-then-recall sequence task between four coloured targets."""
+
+    def __init__(self, sequence: Sequence[int], memorize_s: float, recall_s: float) -> None:
+        self.sequence = list(sequence)
+        self.memorize_s = float(memorize_s)
+        self.recall_s = max(float(recall_s), 0.5)
+        self._start = np.asarray([0.36, 0.0, 0.0], dtype=np.float64)
+        self._targets = [
+            np.asarray(COLOR_BLOCK_POSITIONS[index], dtype=np.float64) for index in self.sequence
+        ]
+
+    def phase(self, time_s: float) -> Literal["memorize", "recall"]:
+        return "memorize" if time_s < self.memorize_s else "recall"
+
+    def reference(self, time_s: float) -> tuple[np.ndarray, np.ndarray]:
+        if time_s < self.memorize_s or not self._targets:
+            return self._start.copy(), np.zeros(3, dtype=np.float64)
+        leg_s = self.recall_s / len(self._targets)
+        progressed = min(time_s - self.memorize_s, self.recall_s)
+        index = min(int(progressed / leg_s), len(self._targets) - 1)
+        origin = self._start if index == 0 else self._targets[index - 1]
+        fraction = min((progressed - index * leg_s) / leg_s, 1.0)
+        target = self._targets[index]
+        velocity = (
+            (target - origin) / leg_s if fraction < 1.0 else np.zeros(3, dtype=np.float64)
+        )
+        return origin + fraction * (target - origin), velocity
+
+    def progress(self, time_s: float) -> float:
+        if time_s < self.memorize_s:
+            return float(0.2 * time_s / max(self.memorize_s, 1e-6))
+        recall_fraction = min((time_s - self.memorize_s) / self.recall_s, 1.0)
+        return float(0.2 + 0.8 * recall_fraction)
+
+
 class TrainingSession:
     """Own one simulation-only session and expose a page-safe state machine.
 
@@ -101,6 +181,9 @@ class TrainingSession:
         self._score = 0.0
         self._parameters = self._baseline.copy()
         self._task: ReferenceTrajectory | None = None
+        self._maze: _PathFollow | None = None
+        self._maze_walls: list[list[float]] = []
+        self._color: _ColorMemoryPlan | None = None
         self._telemetry: Telemetry | None = None
         self._report: TrainingReport | None = None
         self._last_agent_event: AgentEvent | None = None
@@ -143,7 +226,13 @@ class TrainingSession:
 
         safety = self._supervisor.configuration
         return ConfigSummary(
-            tasks=["point_to_point", "circle_tracking", "figure8_tracking"],
+            tasks=[
+                "point_to_point",
+                "circle_tracking",
+                "figure8_tracking",
+                "maze_navigation",
+                "color_memory",
+            ],
             patient_profiles=["mild", "moderate", "severe"],
             modes=["fixed", "rl"],
             refresh_hz=self.refresh_hz,
@@ -188,6 +277,38 @@ class TrainingSession:
             float(raw["path_width_tolerance"]),
         )
 
+    def _build_maze(self, raw: Mapping[str, Any]) -> tuple[_PathFollow, list[list[float]]]:
+        """Build the S-shaped corridor maze and its waypoint reference path."""
+
+        walls = [
+            [0.15, -0.22, 0.60, -0.22],
+            [0.15, 0.22, 0.60, 0.22],
+            [0.15, -0.22, 0.15, 0.22],
+            [0.60, -0.22, 0.60, 0.22],
+            [0.28, -0.22, 0.28, 0.10],
+            [0.42, -0.10, 0.42, 0.22],
+        ]
+        waypoints = [
+            [0.18, -0.12, 0.0],
+            [0.22, 0.15, 0.0],
+            [0.32, 0.15, 0.0],
+            [0.38, -0.15, 0.0],
+            [0.48, -0.15, 0.0],
+            [0.55, -0.05, 0.0],
+            [0.55, 0.12, 0.0],
+        ]
+        return _PathFollow(waypoints, float(raw["reference_speed"])), walls
+
+    def _build_color_memory(self, raw: Mapping[str, Any]) -> _ColorMemoryPlan:
+        """Build a per-session random colour-sequence memory task."""
+
+        rng = random.Random(self._session_id)
+        sequence = [
+            rng.randrange(len(COLOR_BLOCK_NAMES)) for _ in range(int(raw["sequence_length"]))
+        ]
+        memorize_s = float(raw["memorize_duration"])
+        return _ColorMemoryPlan(sequence, memorize_s, self._duration_s - memorize_s)
+
     def _cancel_run_task(self) -> None:
         if self._run_task is not None and not self._run_task.done():
             self._run_task.cancel()
@@ -208,7 +329,20 @@ class TrainingSession:
         self._progress = 0.0
         self._score = 0.0
         self._parameters = self._baseline.copy()
-        self._task = self._build_task(self._task_name, self._duration_s)
+        self._task = None
+        self._maze = None
+        self._maze_walls = []
+        self._color = None
+        if self._task_name == "maze_navigation":
+            self._maze, self._maze_walls = self._build_maze(
+                self._task_config["tasks"][self._task_name]
+            )
+        elif self._task_name == "color_memory":
+            self._color = self._build_color_memory(
+                self._task_config["tasks"][self._task_name]
+            )
+        else:
+            self._task = self._build_task(self._task_name, self._duration_s)
         self._telemetry = None
         self._report = None
         self._agent_chat.clear()
@@ -245,9 +379,19 @@ class TrainingSession:
             raise
 
     def _tick(self) -> None:
-        if self._task is None:
+        task_phase: Literal["memorize", "recall"] | None = None
+        if self._task is not None:
+            reference, reference_velocity = self._task.reference(self._elapsed_s)
+            progress_target = self._task.progress(self._elapsed_s)
+        elif self._maze is not None:
+            reference, reference_velocity = self._maze.reference(self._elapsed_s)
+            progress_target = self._maze.progress(self._elapsed_s)
+        elif self._color is not None:
+            reference, reference_velocity = self._color.reference(self._elapsed_s)
+            progress_target = self._color.progress(self._elapsed_s)
+            task_phase = self._color.phase(self._elapsed_s)
+        else:
             return
-        reference, reference_velocity = self._task.reference(self._elapsed_s)
         phase = 2.0 * np.pi * self._elapsed_s / max(self._duration_s, self._tick_dt_s)
         lag = np.asarray(
             [0.012 * np.sin(phase), 0.008 * np.sin(phase + 0.7), 0.025 * np.sin(phase)],
@@ -299,7 +443,7 @@ class TrainingSession:
             self._safety_triggers += 1
         force_norm = float(np.linalg.norm(interaction_force[:2]))
         error_norm = float(np.linalg.norm(tracking_error))
-        progress = self._task.progress(self._elapsed_s)
+        progress = progress_target
         progress_delta = max(0.0, progress - self._progress)
         human_power = max(0.0, float(np.dot(interaction_force, velocity)))
         assistance_work = abs(float(self._parameters[3] * np.dot(tracking_error, velocity)))
@@ -363,6 +507,19 @@ class TrainingSession:
             score=self._score,
             safety_status="fallback" if decision.fallback else "safe",
             safety_reasons=list(decision.reasons),
+            maze_walls=self._maze_walls,
+            color_block_positions=(
+                [list(position) for position in COLOR_BLOCK_POSITIONS]
+                if self._color is not None
+                else []
+            ),
+            color_block_names=list(COLOR_BLOCK_NAMES) if self._color is not None else [],
+            color_sequence=(
+                [COLOR_BLOCK_NAMES[index] for index in self._color.sequence]
+                if self._color is not None
+                else []
+            ),
+            task_phase=task_phase,
             agent_event=(
                 AgentEventPayload(
                     event=sample_agent_event.event,
