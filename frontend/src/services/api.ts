@@ -38,3 +38,11 @@ export function setMode(mode: ControlMode) {
     body: JSON.stringify({ mode })
   });
 }
+
+export async function chatWithAgent(message: string): Promise<string> {
+  const response = await request<{ message: string }>("/api/agent/chat", {
+    method: "POST",
+    body: JSON.stringify({ message })
+  });
+  return response.message;
+}

@@ -1,7 +1,8 @@
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { LineChart } from "./components/LineChart";
 import { TrajectoryChart } from "./components/TrajectoryChart";
 import {
+  chatWithAgent,
   getConfig,
   getSession,
   pauseSession,
@@ -11,6 +12,7 @@ import {
   stopSession
 } from "./services/api";
 import type {
+  AgentChatMessage,
   ConfigSummary,
   ControlMode,
   PatientProfile,
@@ -53,7 +55,8 @@ const initialSnapshot: SessionSnapshot = {
   telemetry: null,
   report: null,
   agent_event: null,
-  agent_summary: null
+  agent_summary: null,
+  agent_chat: []
 };
 
 function App() {
@@ -64,6 +67,9 @@ function App() {
   const [patient, setPatient] = useState<PatientProfile>("moderate");
   const [mode, setModeValue] = useState<ControlMode>("fixed");
   const [error, setError] = useState<string | null>(null);
+  const [chatInput, setChatInput] = useState("");
+  const [chatSending, setChatSending] = useState(false);
+  const chatFeedRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     void Promise.all([getConfig(), getSession()])
@@ -98,6 +104,29 @@ function App() {
       setError(String(reason));
     }
   };
+
+  const sendChat = async () => {
+    const text = chatInput.trim();
+    if (!text || chatSending) return;
+    setChatSending(true);
+    setError(null);
+    try {
+      await chatWithAgent(text);
+      setSnapshot(await getSession());
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setChatSending(false);
+      setChatInput("");
+    }
+  };
+
+  const chatFeed = snapshot.agent_chat ?? [];
+
+  useEffect(() => {
+    const feed = chatFeedRef.current;
+    if (feed) feed.scrollTop = feed.scrollHeight;
+  }, [chatFeed.length]);
 
   const telemetry = snapshot.telemetry;
   const agentEvent = snapshot.agent_event ?? telemetry?.agent_event ?? null;
@@ -210,7 +239,34 @@ function App() {
         <div className="agent-message"><p className="agent-label"><span>INTERACTION AGENT</span> / {agentEvent?.event ?? "SYSTEM STANDBY"}</p><strong>{agentEvent?.message ?? "开始训练后，这里会显示基于运动状态的训练提示。"}</strong></div>
         <div className="agent-side"><span className="agent-side-dot" />只读反馈模式</div>
       </section>
-
+      
+      <section className="card agent-chat-card">
+        <div className="panel-heading">
+          <div><div className="section-kicker">LLM INTERACTION</div><h2>智能教练</h2><p>根据患者表现生成个性化反馈与总结，可随时提问</p></div>
+          <span className="panel-badge">DeepSeek</span>
+        </div>
+        <div className="chat-feed" ref={chatFeedRef}>
+          {chatFeed.length === 0 ? (
+            <div className="chat-empty"><div className="empty-icon">✦</div><div><strong>对话尚未开始</strong><span>开始训练后，规则事件与 LLM 反馈会出现在这里；训练结束后可向智能教练提问。</span></div></div>
+          ) : chatFeed.map((item: AgentChatMessage, index: number) => (
+            <div className={`chat-message ${item.role} source-${item.source}`} key={`${item.timestamp_s}-${index}`}>
+              <span className="chat-avatar">{item.role === "user" ? "你" : "AI"}</span>
+              <div className="chat-bubble-wrap"><span className="chat-bubble">{item.message}</span><small>{item.source === "llm" ? "LLM 生成" : item.source === "rules" ? "规则反馈" : "患者 / 治疗师"}</small></div>
+            </div>
+          ))}
+        </div>
+        <div className="chat-input-row">
+          <input
+            value={chatInput}
+            onChange={(event) => setChatInput(event.target.value)}
+            onKeyDown={(event) => { if (event.key === "Enter") void sendChat(); }}
+            placeholder="问问智能教练，例如：今天练得怎么样？"
+            disabled={chatSending}
+          />
+          <button className="primary action-button" onClick={() => void sendChat()} disabled={chatSending}><span>➤</span> {chatSending ? "思考中" : "发送"}</button>
+        </div>
+      </section>
+      
       <section className="dashboard-grid">
         <Panel className="trajectory-panel" title="实时轨迹" subtitle="TASK SPACE / [ X, Y ]" badge={`${history.length} SAMPLES`}><TrajectoryChart points={history} /></Panel>
         <Panel title="交互力曲线" subtitle="FORCE TELEMETRY / [ Fx, Fy, Tz ]" badge={telemetry ? "LIVE" : "STANDBY"}><LineChart values={forceSeries} colors={["#4ed7ee", "#ffac63", "#a98aff"]} labels={["Fx", "Fy", "Tz"]} /></Panel>

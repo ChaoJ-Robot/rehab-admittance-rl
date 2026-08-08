@@ -1,336 +1,294 @@
-# rl_admittance_rehab_ws
+<div align="center">
 
-基于安全强化学习与交互 Agent 的平面三自由度上肢康复机器人自适应导纳训练系统。
+# 基于安全强化学习与交互 Agent 的上肢康复机器人自适应导纳训练系统
 
-当前仓库已完成 **Phase 0：仓库初始化**、**Phase 1：MuJoCo 三自由度机器人**、**Phase 2：固定参数导纳控制**、**Phase 3：虚拟患者**、**Phase 4：Gymnasium 训练环境**、**Phase 5：SAC 训练**、**Phase 6：安全策略部署层**、**Phase 7：交互页面**、**Phase 8：交互 Agent**、**Phase 9：ROS2 接口** 和 **Phase 10：系统实验与项目包装**。
+**Safe RL-Driven Adaptive Admittance Training System with an LLM Interaction Agent**
 
-## 环境
+![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)
+![RL](https://img.shields.io/badge/RL-SAC%20%7C%20PPO-orange)
+![Sim](https://img.shields.io/badge/Simulation-MuJoCo-green?logo=mujoco)
+![LLM](https://img.shields.io/badge/LLM-DeepSeek-8a2be2)
+![License](https://img.shields.io/badge/License-MIT-lightgrey)
+![Tests](https://img.shields.io/badge/tests-pytest%20%7C%20ruff%20%7C%20mypy-brightgreen)
 
-- Python 3.10+
-- 配置格式：YAML
-- 测试：pytest
-- 代码检查与格式化：ruff
-- 类型检查配置：mypy
+*让强化学习做"大脑"、传统控制做"小脑"、大模型做"教练"，构建安全、自适应、可对话的上肢康复训练闭环。*
 
-新手学习入口：[新手学习手册.docx](新手学习手册.docx)，对应 Markdown 源文件为 [docs/新手学习手册.md](docs/新手学习手册.md)。
+</div>
 
-## 安装
+---
 
-```bash
-cd rl_admittance_rehab_ws
-python3 -m venv .venv
-source .venv/bin/activate
-python3 -m pip install -r requirements.txt
-python3 -m pip install -e .
+## 一、项目背景
+
+平面三自由度上肢康复机器人通常采用**固定参数导纳控制**：阻尼过小会导致响应振荡、放大异常扰动；阻尼过大则运动迟缓、患者主动参与度下降。而传统人工调参依赖经验，**难以连续适配不同患者、不同训练阶段，以及同一患者在疲劳前后的运动能力变化**。
+
+本项目构建了一套 **安全强化学习（Safe RL）驱动的自适应导纳训练系统**：
+
+- 强化学习作为"大脑"，在安全约束下**低频（1–5 Hz）在线调整导纳参数**（阻尼、辅助增益、速度限制）；
+- 底层柔顺控制仍由**传统导纳控制器**执行，RL 不进入电机控制闭环；
+- 引入 **LLM 交互 Agent**，实时感知训练状态，为患者提供任务引导、过程反馈与训练总结，形成 **"感知—决策—执行—反馈"** 的完整人机交互闭环。
+
+项目覆盖 **MuJoCo 数字孪生 → 虚拟患者建模 → Gymnasium 训练环境 → SAC/PPO 策略训练 → 安全部署层 → 实时交互页面 → LLM 交互 → ROS2 真机接口** 的完整链路。
+
+---
+
+## 二、核心创新点
+
+| # | 创新点 | 说明 |
+|---|--------|------|
+| 1 | **RL 只调参、不进环** | SAC 策略仅低频输出导纳参数增量，电机控制仍由确定性导纳控制器执行，从架构上隔离 RL 不确定性 |
+| 2 | **独立安全监督器** | 裁剪 → 变化率限制 → 边界投影 → 稳定性检查四级流水线，异常/NaN/超力/掉线时**自动回退保守参数**，安全逻辑完全不依赖 RL 模型 |
+| 3 | **参数化虚拟患者** | 轻/中/重度阻抗模型，模拟主动力、反应延迟、方向偏置、力噪声、周期性震颤及**基于主动功率的疲劳累积与恢复**，为训练提供可随机化、可泛化的场景 |
+| 4 | **规则检测 + LLM 异步表达的分层交互 Agent** | 规则层保证 20 Hz 实时、确定性事件检测；LLM（DeepSeek）仅**异步**增强表达（事件润色 / 个性化总结 / 对话问答），失败自动回退模板，与控制环完全解耦 |
+| 5 | **全链路工程化可复现** | 多随机种子、配置目录 SHA-256 哈希、Git commit 记录、`pytest`/`ruff`/`mypy` 三重验收 |
+
+---
+
+## 三、系统架构
+
+```mermaid
+flowchart TB
+    subgraph SIM["仿真与感知层"]
+        MUJOCO["MuJoCo 数字孪生<br/>3-DoF 平面机器人"]
+        PATIENT["虚拟患者模型<br/>轻/中/重度 · 疲劳 · 震颤"]
+    end
+
+    subgraph LEARN["学习与决策层"]
+        SAC["SAC / PPO 策略<br/>低频 1-5 Hz"]
+        SAFETY["独立安全监督器<br/>裁剪·限率·投影·稳定性"]
+    end
+
+    subgraph EXEC["执行层"]
+        ADM["导纳控制器<br/>D / Ka / λv 参数"]
+    end
+
+    subgraph INTERACT["交互层"]
+        RULE["规则 Agent<br/>20 Hz 事件检测"]
+        LLM["LLM Agent · DeepSeek<br/>异步润色 · 总结 · 对话"]
+        UI["React 前端<br/>WebSocket 20 Hz"]
+    end
+
+    PATIENT -->|"交互力 / 主动功率"| MUJOCO
+    MUJOCO -->|"状态观测"| SAC
+    SAC -->|"参数增量 Δ[D, Ka, λv]"| SAFETY
+    SAFETY -->|"安全参数"| ADM
+    ADM -->|"柔顺力指令"| MUJOCO
+    MUJOCO -->|"20 Hz 遥测"| RULE
+    RULE -->|"事件触发"| LLM
+    RULE --> UI
+    LLM -->|"总结 / 润色 / 问答"| UI
+
+    style SAFETY fill:#2d5a3d,stroke:#4caf50,color:#fff
+    style LLM fill:#4a2d6b,stroke:#9c6bce,color:#fff
+    style SAC fill:#5a3d2d,stroke:#ce9c6b,color:#fff
 ```
 
-## Phase 0 验证
+> **关键设计**：RL 与 LLM 都被"关在笼子里"——RL 只输出任务空间导纳参数、LLM 只生成文本，二者均不接触电机力矩/电流/关节指令，任何异常都触发确定性回退。
 
-```bash
-python3 -m scripts.check_config
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest
-ruff check .
-ruff format --check .
-mypy rehab_sim scripts
+---
+
+## 四、机器人装置与数字孪生
+
+装置为平面三自由度串联结构，任务空间 `[x, y, θ]`，人机交互力 `[Fx, Fy, Tz]`。CAD 模型经 STEP → URDF/MJCF 转换后导入 MuJoCo，三关节零位按 CAD 校正为三连杆共线。
+
+<p align="center">
+  <img src="docs/images/robot_view1.png" width="45%" alt="机器人 CAD 视图 1"/>
+  <img src="docs/images/robot_view2.png" width="45%" alt="机器人 CAD 视图 2"/>
+</p>
+
+<p align="center">
+  <img src="docs/images/mujoco_preview.png" width="60%" alt="MuJoCo 数字孪生预览"/>
+</p>
+
+运动学与 MuJoCo 运行时接口：
+
+- 正/逆运动学与 DLS IK：`rehab_sim/robot/kinematics.py`
+- MuJoCo 机器人封装与外力注入：`rehab_sim/robot/mujoco_robot.py`
+
+---
+
+## 五、核心技术模块
+
+### 5.1 安全强化学习自适应导纳
+
+- **问题建模**：RL 定位为低频导纳参数调节器，动作空间为四维参数增量 `[ΔDxy, ΔDθ, ΔKa, Δλv]`；观测采用 0.5 s 滑动窗口统计特征（轨迹误差、交互力、患者主动功率、运动平滑度、疲劳估计等）。
+- **奖励设计**：多分量奖励函数——任务进度、跟踪误差、过大交互力、运动突变、辅助能量、患者主动功率、成功与不安全终止。
+- **训练环境**：点到点、圆轨迹、"8"字轨迹三类 Gymnasium 连续控制环境，经 SB3 `check_env` 验证，固定种子可复现。
+- **算法**：SAC（`MultiInputPolicy` + `VecNormalize`）为主算法，PPO 作为对比基线。
+
+### 5.2 独立安全部署层
+
+策略动作依次经过 **裁剪 → 参数变化率限制 → 边界投影 → 稳定性检查**；在推理异常/超时、NaN、传感器掉线、交互力超限时自动回退到保守固定参数。训练期探索与部署期确定性推理完全解耦。
+
+### 5.3 LLM 交互 Agent（规则检测 + LLM 异步表达）
+
+这是本项目的**交互层创新**，采用分层设计兼顾实时性、可靠性与个性化：
+
+```
+患者训练表现（20 Hz 遥测）
+        │
+        ▼
+规则 Agent（确定性 · 零延迟 · 免费）── 事件检测 → 规则消息 → 聊天面板
+        │ 事件触发
+        ▼
+异步队列 + 后台 Worker ── LLM 润色事件 / 生成总结 / 回答提问（DeepSeek）
+        │ 失败 · 超时 · 缺 Key
+        ▼
+  自动回退规则模板（用户无感知）
 ```
 
-`check_config` 会加载 `configs/` 下的九个 YAML 文件并输出配置摘要。当前配置中的机器人、控制器、安全阈值、Agent 阈值、ROS2 硬件参数和实验参数仍是明确标记的仿真/开发占位值，不能用于控制真实机器人。
+- **规则层**：识别跟踪误差过大、交互力过大、速度过快/过慢、患者不活跃、疲劳、安全停止等 8 类事件，带事件冷却与结构化审计日志；
+- **LLM 层**：
+  - *事件润色*——把规则消息个性化为有温度的口头反馈；
+  - *训练总结*——基于训练报告与事件序列，用 JSON 结构化输出生成亮点/风险提示/下一步建议；
+  - *对话问答*——患者/治疗师可随时提问，LLM 基于当前训练数据作答；
+- **安全与解耦**：LLM 调用全部异步（`asyncio.Queue` + 后台 Worker），与 20 Hz 控制环完全解耦；API Key 仅从环境变量读取；任何失败返回 `None` 回退模板，**绝不阻塞或影响控制**。
 
-## Phase 1：MuJoCo 三自由度机器人
+### 5.4 实时交互系统与机器人接口
 
-模型与网格位于 `assets/mujoco/`，机器人任务空间为 `[x, y, theta]`，交互力接口为 `[Fx, Fy, Tz]`。三个关节均为绕 MuJoCo +Z 轴的转动关节，零位按 CAD 校正为三连杆共线。`tool_tip` 是末端交互 site；其平面偏置来自 CAD 网格包络估计，真实机器人使用前必须重新标定。
+- **后端**：FastAPI + WebSocket 实现 20 Hz 实时遥测（参考/实际轨迹、Fx/Fy/Tz 力曲线、导纳参数、安全状态、疲劳估计、训练摘要），支持任务/患者/控制模式切换；
+- **前端**：React + TypeScript + Vite 实时图表与智能教练聊天面板；
+- **ROS2**：自定义接口消息、仿真/真机统一 `RobotAdapter` 桥接、确定性策略节点与任务管理器，支持固定参数模式独立运行与通信看门狗安全回退。
 
-运动学和 MuJoCo 运行时接口分别位于：
+---
 
-- `rehab_sim/robot/kinematics.py`
-- `rehab_sim/robot/mujoco_robot.py`
+## 六、实验结果
 
-启动 1000 步无界面验证：
+以 SAC 为主算法，与 PPO、固定导纳、规则自适应、模糊控制共**五种方法**在轻/中/重度虚拟患者上对比，评估成功率、安全终止率、跟踪误差、峰值交互力、患者主动做功占比、辅助能量与参数振荡率。
 
-```bash
-python3 -m scripts.run_phase1_sim --headless --steps 1000
-```
+<p align="center">
+  <img src="docs/images/exp_success_rate.png" width="90%" alt="成功率对比"/>
+  <br/><em>五方法 × 三类患者 成功率对比</em>
+</p>
 
-启动可视化：
+<p align="center">
+  <img src="docs/images/exp_tracking_force.png" width="90%" alt="跟踪与交互力对比"/>
+  <br/><em>跟踪误差与交互力对比</em>
+</p>
 
-```bash
-python3 -m scripts.run_phase1_sim --top
-```
+<p align="center">
+  <img src="docs/images/exp_parameter_stability.png" width="90%" alt="参数稳定性"/>
+  <br/><em>导纳参数稳定性 / 振荡率</em>
+</p>
 
-施加恒定末端外力进行模型测试：
-
-```bash
-python3 -m scripts.run_phase1_sim --headless --steps 1000 --wrench 0.5 -0.2 0.1
-```
-
-Phase 1 的位置执行器和外力接口仅用于数字孪生验证，不是导纳控制器，也不允许 RL 直接替代底层伺服输出。
-
-## Phase 2：固定参数导纳控制
-
-控制器位于 `rehab_sim/controllers/admittance_controller.py`，实现对角三自由度模型：
-
-```text
-M * ddX + D * dX + K * (X - Xr) = F_effective + F_assist
-```
-
-已实现：
-
-- 一阶力信号低通滤波；
-- 软死区；
-- 速度和加速度限幅；
-- 任务空间工作空间裁剪；
-- 固定参数的按需辅助项接口；
-- 与 Phase 1 MuJoCo 模型连接的阻尼最小二乘 IK 目标映射。
-
-仿真基线参数位于 `configs/admittance.yaml`，明确标记为仿真占位值，不能直接用于真实机器人。
-
-运行三类基线实验：
-
-```bash
-python3 -m scripts.run_phase2_baseline --experiment step --duration 3
-python3 -m scripts.run_phase2_baseline --experiment sine --duration 3
-python3 -m scripts.run_phase2_baseline --experiment reverse --duration 3
-```
-
-结果默认写入 `experiments/reports/phase2_baseline/`：
-
-- `*_baseline.csv`：力、期望/实际位姿、速度、加速度和关节目标；
-- `*_baseline.svg`：力、速度和位置曲线；
-- `*_baseline.json`：样本数、峰值速度、峰值力和漂移摘要。
-
-Phase 2 不包含虚拟患者、RL 策略、随机探索、安全策略部署或 Agent。
-
-## Phase 3：虚拟患者
-
-虚拟患者位于 `rehab_sim/patients/`，根据以下模型生成交互力：
-
-```text
-F_h = K_h(X_r-X) + D_h(dX_r-dX)
-      + F_bias + F_noise + F_tremor
-```
-
-已实现：
-
-- 轻度、中度、重度三类 YAML 配置；
-- 主动阻抗力、方向偏置、随机噪声和周期性震颤；
-- 反应延迟队列；
-- 基于患者主动功率的疲劳累积和休息恢复；
-- 独立随机种子、重置和可重复输出；
-- 患者主动功率、疲劳和力分项状态记录。
-
-运行患者力生成演示：
-
-```bash
-python3 -m scripts.run_phase3_patient_demo --duration 8 --sample-time 0.01
-```
-
-结果默认写入 `experiments/reports/phase3_patients/`，每个患者配置包含 CSV 力/状态数据和 SVG 曲线。该脚本是开环患者力生成演示，不是 Gymnasium 环境，也不直接控制机器人。
-
-## Phase 4：Gymnasium 训练环境
-
-环境位于 `rehab_sim/envs/`，提供 `PointReachEnv`、`CircleTrackingEnv` 和 `Figure8TrackingEnv` 三类连续控制任务。动作是低频的导纳参数增量 `[damping_xy, damping_theta, assist_gain, velocity_scale]`，不是关节力矩；观测包含关节状态、末端状态、患者交互力、参考轨迹、跟踪误差、当前导纳参数、任务进度和仿真安全状态。
-
-奖励由进度、归一化跟踪误差、过大交互力、运动突变、辅助能量、参数变化、患者主动功率、任务成功和不安全终止等分项组成，并通过 `info["reward_components"]` 独立记录。环境支持 Gymnasium `reset/step` 接口、有限时域、成功终止和仿真异常终止。
-
-运行 Gymnasium/SB3 检查及短随机策略验证：
-
-```bash
-python3 -m scripts.check_phase4_envs
-```
-
-Phase 4 的集成测试还覆盖 SB3 `check_env`、三个任务的随机策略有限步运行、无 NaN 和固定种子可重复性：
-
-```bash
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q
-```
-
-该阶段只提供环境和固定控制器基线接口，不包含 SAC 训练脚本或真实机器人安全部署。
-
-## Phase 5：SAC 训练
-
-训练入口为 `scripts/train_sac.py`。SAC 使用 `MultiInputPolicy` 读取 Phase 4 的结构化观测，通过 `VecNormalize` 归一化观测和奖励；策略动作仍然是低频的四维导纳参数增量，不是关节力矩或电机命令。训练脚本支持配置文件中的多随机种子，并支持命令行覆盖训练步数、任务、患者、评估频率和设备。
-
-按配置运行五个随机种子：
-
-```bash
-python3 -m scripts.train_sac
-```
-
-快速仿真 smoke run：
-
-```bash
-python3 -m scripts.train_sac \
-  --run-name smoke \
-  --total-timesteps 2000 \
-  --seeds 0 \
-  --learning-starts 256 \
-  --device cpu
-```
-
-每个 run 目录包含：
-
-- `final_model.zip` 和 `vecnormalize.pkl`；
-- 定期 SAC checkpoint、replay buffer 和归一化统计；
-- TensorBoard event 文件；
-- 自动评估历史、成功率、交互力和参数变化/振荡指标；
-- 配置 SHA-256、Git commit 和命令行元数据。
-
-加载已保存模型进行评估：
-
-```bash
-python3 -m scripts.evaluate_sac \
-  --model experiments/trained_models/phase5_sac/<run>/seed_0000/final_model.zip \
-  --vecnormalize experiments/trained_models/phase5_sac/<run>/seed_0000/vecnormalize.pkl
-```
-
-## Phase 6：安全策略部署层
-
-独立安全层位于 `rehab_sim/safety/`，不导入 SAC 或 Stable-Baselines3。策略动作经过以下固定顺序处理：动作裁剪、参数变化率限制、参数边界投影、稳定性检查和安全状态检查。策略输出仍只会转化为 `[Dx, Dy, Dtheta, Ka, velocity_scale]`，不会发布关节力矩或电机命令。
-
-安全运行时会在模型加载失败、推理异常/超时、动作或状态出现 NaN、传感器掉线、交互力接近阈值、力矩/速度/加速度超限时切换到配置的保守固定参数。安全配置中的阈值目前全部是仿真占位值，`hardware_validation_required: true`，不能用于真实患者或真机运行。
-
-运行 Phase 6 安全单元测试：
-
-```bash
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q tests/unit/test_safety.py
-```
-
-Phase 6 不包含交互页面、Agent 或 ROS2 接口。
-
-## Phase 7：交互页面
-
-Phase 7 提供仿真专用的 FastAPI + WebSocket 后端和 React + TypeScript + Vite 前端。后端会话服务维护等待、训练、暂停、完成和停止状态，按 20 Hz 推送任务空间遥测；当前数据源是确定性的 simulation-only provider，不连接真实机器人。Phase 8 在此页面上层接入只读交互 Agent。
-
-启动后端：
-
-```bash
-python3 -m uvicorn backend.app.main:app --reload --port 8000
-```
-
-另开终端启动前端：
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-页面支持：
-
-- 点到点、圆轨迹和八字轨迹任务选择；
-- 轻度/中度/重度患者配置选择；
-- 固定导纳与 RL 参数调节模式切换；
-- 开始、暂停、继续和停止训练；
-- 参考/实际轨迹、`Fx/Fy/Tz` 力曲线和导纳参数曲线；
-- 任务进度、得分、安全状态、患者主动功率和疲劳估计；
-- 训练完成后的误差、峰值力、平滑度、主动做功和辅助做功摘要。
-
-Phase 7 验证：
-
-```bash
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q tests/integration/test_phase7_backend.py
-cd frontend && npm run build
-```
-
-Phase 7 本身不包含 LLM 调用、ROS2 接口或真实机器人控制；交互 Agent 在 Phase 8 独立接入。
-
-## Phase 8：交互 Agent
-
-Agent 位于 `rehab_sim/agent/`，第一版采用规则引擎，不依赖 LLM 或外部 API。它只读取遥测并生成文本反馈，不修改导纳参数、不发布控制命令，也不进入机器人控制闭环。跟踪误差、交互力、速度、患者主动功率和疲劳阈值位于 `configs/agent.yaml`。
-
-已实现：
-
-- 任务开始、跟踪良好、跟踪误差过大、交互力过大、速度过快/过慢、患者不活跃、疲劳和安全停止事件；
-- 事件冷却、结构化事件日志和可注入的可选语音播报回调；
-- 训练结束总结模板，包含亮点、风险提示和下一步建议；
-- Agent 异常隔离，Agent 失败不会中断遥测或安全控制；
-- WebSocket 实时反馈、`GET /api/agent/events` 审计接口和前端反馈提示/总结卡片。
-
-验证：
-
-```bash
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q
-cd frontend && npm run build
-```
-
-Phase 8 不包含 ROS2 接口；后续如接入 LLM，也只能生成解释/语音文本，不能进入控制链路。
-
-## Phase 9：ROS2 与真实机器人接口
-
-ROS2 工作区位于 `ros2_ws/`，包含：
-
-- `rehab_interfaces`：导纳参数、策略动作、末端状态、力、任务状态、安全状态和实时指标消息，以及任务控制服务；
-- `rehab_robot_bridge`：仿真和 ROS2 驱动共用的 `RobotAdapter` 接口。桥接层订阅 `/joint_states`、`/rehab_robot/end_effector_state` 和 `/rehab_robot/wrench`，接收并审计任务空间导纳参数，不提供电机力矩或电流接口；具体硬件驱动仍需经过验证后接入；
-- `rehab_policy_node`：固定参数模式和确定性参数策略，所有参数经过既有独立安全监督器、通信看门狗和低速测试限幅；
-- `rehab_task_manager`：启动、暂停、停止、复位、患者配置和策略模式服务。
-
-ROS2 参数位于 `configs/ros2.yaml`。默认配置为固定参数、仿真输入、低速测试模式和 `hardware.enabled: false`；真实驱动接入前必须完成硬件限位、力矩/速度阈值、急停、使能和看门狗验证。低速模式只限制任务空间速度缩放，不改变控制器接口为电机命令。
-
-构建和启动：
-
-```bash
-source /opt/ros/humble/setup.bash
-python3 -m pip install -e .
-colcon build --base-paths ros2_ws --symlink-install
-source install/setup.bash
-
-ros2 run rehab_task_manager task_manager_node --ros-args -p config_dir:=$PWD/configs
-ros2 run rehab_robot_bridge robot_bridge_node --ros-args -p config_dir:=$PWD/configs
-ros2 run rehab_policy_node policy_node --ros-args -p config_dir:=$PWD/configs
-```
-
-Phase 9 验证：
-
-```bash
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q
-source /opt/ros/humble/setup.bash
-colcon build --base-paths ros2_ws --symlink-install
-```
-
-当前阶段完成的是 ROS2 接口和无人体接触的仿真/台架准备；没有连接具体真实机器人驱动，也没有进行人体接触测试。任何通信超时都会选择安全回退参数，固定参数模式可以独立于策略运行。
-
-## Phase 10：系统实验与项目包装
-
-Phase 10 提供统一的一键对比入口 `scripts/run_phase10_experiments.py`。默认实验矩阵包含五种方法和三类虚拟患者：
-
-- 固定导纳 `fixed_admittance`；
-- 规则自适应 `rule_adaptive`；
-- 模糊规则 `fuzzy_control`；
-- SAC；
-- PPO。
-
-所有方法使用同一个 MuJoCo/Gymnasium 任务和同一个四维低频导纳参数动作空间。默认配置、方法阈值、患者矩阵、随机种子和训练步数位于 `configs/phase10.yaml`，SAC/PPO 训练只调整导纳参数，不发布电机命令。
-
-完整实验：
+一键流水线自动输出逐 episode 数据、统计表、曲线、Markdown 报告与演示视频：
 
 ```bash
 python3 -m scripts.run_phase10_experiments
 ```
 
-新环境快速验收：
+---
 
-```bash
-python3 -m scripts.run_phase10_experiments --quick \
-  --output-dir experiments/reports/phase10_quick
+## 七、实时交互界面
+
+前端提供 20 Hz 实时遥测可视化与智能教练聊天面板。训练运行中实时展示轨迹、交互力、导纳参数与安全状态：
+
+<p align="center">
+  <img src="docs/images/ui_running.png" width="95%" alt="训练运行中的实时界面"/>
+  <br/><em>训练运行中：实时轨迹 · 交互力曲线 · 导纳参数 · 安全状态</em>
+</p>
+
+训练完成后，LLM 自动生成个性化总结并写入聊天流，患者/治疗师可随时提问：
+
+<p align="center">
+  <img src="docs/images/ui_completed.png" width="95%" alt="训练完成后的界面"/>
+  <br/><em>训练完成：LLM 训练总结 + 智能教练对话</em>
+</p>
+
+---
+
+## 八、项目结构
+
+```
+rl_admittance_rehab_ws/
+├── assets/mujoco/            # MJCF 数字孪生与 mesh 资产
+├── configs/                  # YAML 配置体系（机器人/导纳/安全/Agent/RL/ROS2）
+├── rehab_sim/                # 核心仿真与控制库
+│   ├── robot/                #   运动学、MuJoCo 机器人
+│   ├── controllers/          #   任务空间导纳控制器
+│   ├── patients/             #   虚拟患者与疲劳模型
+│   ├── envs/                 #   Gymnasium 训练环境
+│   ├── rewards/              #   多分量奖励函数
+│   ├── safety/               #   独立安全监督器
+│   ├── agent/                #   规则 Agent + LLM Agent
+│   ├── rl/                   #   SAC/PPO 训练与评估
+│   └── tasks/                #   参考轨迹（点到点/圆/8字）
+├── backend/                  # FastAPI + WebSocket 后端
+├── frontend/                 # React + TypeScript + Vite 前端
+├── ros2_ws/src/              # ROS2 接口、策略节点、任务管理器
+├── scripts/                  # 训练/评估/实验一键脚本
+├── experiments/              # 实验数据、模型与报告
+├── tests/                    # unit / integration / regression
+└── docs/                     # 报告、简历描述、学习手册、图片
 ```
 
-可选录制无头 MuJoCo 演示视频：
+---
+
+## 九、快速开始
+
+### 环境要求
+
+- Python 3.10+
+- Node.js 18+（前端）
+- 可选：ROS2 Humble（真机接口）
+
+### 安装
 
 ```bash
-python3 -m scripts.run_phase10_experiments --quick --record-video
+cd rl_admittance_rehab_ws
+python3 -m venv .venv && source .venv/bin/activate
+python3 -m pip install -r requirements.txt
+python3 -m pip install -e .
 ```
 
-输出目录包含：
+### 配置 LLM（可选）
 
-- `episode_metrics.csv`：逐 episode 原始指标；
-- `summary.csv` / `summary.json`：按方法和患者聚合的均值、标准差、成功率、安全率、误差、峰值力、患者主动功率、辅助能量和参数振荡率；
-- `success_rate.png`、`tracking_force_comparison.png`、`parameter_stability.png`：自动生成图表；
-- `phase10_report.md`：带配置哈希、Git commit 和限制说明的实验报告；
-- `models/`：短周期 SAC/PPO 模型及 VecNormalize 统计；
-- `demo_*.mp4`：可选的无头 MuJoCo 轨迹演示视频。
+```bash
+cp .env.example .env      # 填入你的 DeepSeek API Key
+```
 
-项目报告和简历描述分别位于 [docs/phase10_project_report.md](docs/phase10_project_report.md) 和 [docs/resume_description.md](docs/resume_description.md)。Phase 10 的仿真统计不能替代真实硬件阈值验证、人体实验或临床结论。
+> 不配置 Key 时，系统自动回退为纯规则交互模式，其余功能不受影响。启用/关闭 LLM 见 `configs/agent.yaml` 中 `agent.llm.enabled`。
 
-## 项目规范
+### 启动实时交互页面
 
-完整设计报告保存在 [PROJECT_SPEC.md](PROJECT_SPEC.md)。每次只推进一个 Phase，并在对应阶段完成测试和文档更新。
+```bash
+# 终端 1：后端（端口 8000）
+python3 -m uvicorn backend.app.main:app --port 8000
+
+# 终端 2：前端（端口 5173）
+cd frontend && npm install && npm run dev
+```
+
+浏览器打开 `http://localhost:5173`，配置任务/患者/模式后点击"开始训练"。
+
+### 训练与实验
+
+```bash
+python3 -m scripts.train_sac                # 训练 SAC
+python3 -m scripts.run_phase10_experiments  # 五方法对比实验
+python3 -m scripts.run_phase1_sim --top     # MuJoCo 可视化
+```
+
+---
+
+## 十、测试与工程化
+
+```bash
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest     # 单元 + 集成 + 回归
+ruff check .                                # 代码检查
+mypy rehab_sim backend                      # 类型检查
+```
+
+- **可复现性**：每个 episode 使用显式随机种子；输出记录配置目录 SHA-256 与 Git commit；SAC/PPO 保存模型与 `VecNormalize` 统计；`--quick` 支持新环境短周期端到端验证。
+- **测试覆盖**：LLM 层使用 mock HTTP 传输测试（不依赖外部 API），覆盖成功解析、JSON 容错、超时/失败回退、冷却与禁用路径。
+
+---
+
+## 十一、安全边界与限制
+
+> ⚠️ 强化学习与对比策略**不直接输出电机力矩、电流或关节命令**。真实机器人接入仍需经过驱动器、机械限位、急停、力矩/速度阈值、零力校准与无人体台架测试。虚拟患者指标是仿真代理量，不能直接解释为临床结论。本项目结果为仿真/开发对比，不替代真实机器人与人体验证。
+
+---
+
+## 许可证
+
+本项目采用 [MIT License](LICENSE)。

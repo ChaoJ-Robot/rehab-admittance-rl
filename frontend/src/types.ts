@@ -40,6 +40,14 @@ export interface AgentSummary {
   highlights: string[];
   recommendation: string;
   event_count: number;
+  source?: "rules" | "llm";
+}
+
+export interface AgentChatMessage {
+  role: "user" | "agent";
+  message: string;
+  source: "rules" | "llm" | "user";
+  timestamp_s: number;
 }
 
 export interface TrainingReport {
@@ -71,6 +79,7 @@ export interface SessionSnapshot {
   report: TrainingReport | null;
   agent_event: AgentEvent | null;
   agent_summary: AgentSummary | null;
+  agent_chat: AgentChatMessage[];
 }
 
 export interface ConfigSummary {

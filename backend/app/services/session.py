@@ -7,10 +7,20 @@ import logging
 import time
 import uuid
 from collections import deque
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Literal
 
 import numpy as np
-from rehab_sim.agent import AgentEvent, AgentObservation, RuleBasedAgent, load_agent_config
+from dotenv import load_dotenv
+from rehab_sim.agent import (
+    AgentEvent,
+    AgentObservation,
+    LLMAgent,
+    RuleBasedAgent,
+    load_agent_config,
+    load_llm_config,
+)
 from rehab_sim.config import load_yaml
 from rehab_sim.controllers import AdmittanceParameters
 from rehab_sim.safety import (
@@ -27,6 +37,7 @@ from rehab_sim.tasks import (
 )
 
 from backend.app.schemas.models import (
+    AgentChatMessage,
     AgentEventPayload,
     AgentSummaryPayload,
     ConfigSummary,
@@ -43,6 +54,16 @@ from backend.app.schemas.models import (
 LOGGER = logging.getLogger("rehab.backend.session")
 
 
+@dataclass(frozen=True)
+class _LLMTask:
+    """One asynchronous LLM job; the control path never awaits it."""
+
+    kind: Literal["enrich", "summary"]
+    event: AgentEvent | None = None
+    report: dict[str, Any] | None = None
+    events: list[AgentEvent] | None = None
+
+
 class TrainingSession:
     """Own one simulation-only session and expose a page-safe state machine.
 
@@ -56,10 +77,16 @@ class TrainingSession:
 
     def __init__(self, root: Path | None = None) -> None:
         self.root = Path(root or Path(__file__).resolve().parents[3])
+        load_dotenv(self.root / ".env")
         self._task_config = load_yaml(self.root / "configs" / "tasks.yaml")
         self._admittance_config = load_yaml(self.root / "configs" / "admittance.yaml")
         self._safety_config = load_yaml(self.root / "configs" / "safety.yaml")
-        self._agent = RuleBasedAgent(load_agent_config(self.root / "configs" / "agent.yaml"))
+        agent_config = load_agent_config(self.root / "configs" / "agent.yaml")
+        self._agent = RuleBasedAgent(agent_config)
+        self._llm_agent = LLMAgent(load_llm_config(self.root / "configs" / "agent.yaml"))
+        self._llm_queue: asyncio.Queue[_LLMTask] = asyncio.Queue()
+        self._llm_worker_task: asyncio.Task[None] | None = None
+        self._agent_chat: list[AgentChatMessage] = []
         safety = load_safety_configuration(self._admittance_config, self._safety_config)
         self._supervisor = SafetySupervisor(safety)
         self._baseline = parameter_vector(AdmittanceParameters.from_config(self._admittance_config))
@@ -184,12 +211,16 @@ class TrainingSession:
         self._task = self._build_task(self._task_name, self._duration_s)
         self._telemetry = None
         self._report = None
+        self._agent_chat.clear()
         try:
             self._last_agent_event = self._agent.start(self._task_name, self._patient_profile)
+            if self._last_agent_event is not None:
+                self._append_chat("agent", self._last_agent_event.message, "rules")
         except Exception:  # noqa: BLE001 - Agent failure cannot block session start
             LOGGER.exception("agent_start_failed")
             self._last_agent_event = None
         self._agent_summary = None
+        self._ensure_llm_worker()
         self._history.clear()
         self._error_sum = 0.0
         self._force_sum = 0.0
@@ -304,6 +335,9 @@ class TrainingSession:
             LOGGER.exception("agent_observe_failed")
         if agent_event is not None:
             self._last_agent_event = agent_event
+            self._append_chat("agent", agent_event.message, "rules")
+            if self._llm_agent.event_enrichment_enabled:
+                self._llm_queue.put_nowait(_LLMTask(kind="enrich", event=agent_event))
         completion_event: AgentEvent | None = None
         if self._state == "completed":
             self._report = self._make_report()
@@ -428,7 +462,7 @@ class TrainingSession:
         )
 
     def _complete_agent(self, observation: AgentObservation) -> AgentEvent | None:
-        """Run Agent summary generation outside the control path."""
+        """Build the rule-based summary and hand a copy to the LLM worker."""
 
         if self._report is None:
             return None
@@ -445,11 +479,115 @@ class TrainingSession:
                 highlights=summary.highlights,
                 recommendation=summary.recommendation,
                 event_count=summary.event_count,
+                source="rules",
             )
+            if event is not None:
+                self._append_chat("agent", event.message, "rules")
+            if self._llm_agent.summary_enabled:
+                self._llm_queue.put_nowait(
+                    _LLMTask(
+                        kind="summary",
+                        report=report_data,
+                        events=list(self._agent.events),
+                    )
+                )
             return event
         except Exception:  # noqa: BLE001 - Agent failure cannot affect control
             LOGGER.exception("agent_complete_failed")
             return None
+
+    def _append_chat(
+        self,
+        role: Literal["user", "agent"],
+        message: str,
+        source: Literal["rules", "llm", "user"],
+    ) -> None:
+        """Append one message to the interaction feed shown in the UI."""
+
+        self._agent_chat.append(
+            AgentChatMessage(role=role, message=message, source=source, timestamp_s=time.time())
+        )
+
+    def _ensure_llm_worker(self) -> None:
+        """Start the background LLM consumer exactly once per process."""
+
+        if self._llm_worker_task is None or self._llm_worker_task.done():
+            self._llm_worker_task = asyncio.create_task(self._llm_worker_loop())
+
+    async def _llm_worker_loop(self) -> None:
+        """Drain LLM jobs without ever touching the 20 Hz control loop."""
+
+        while True:
+            task = await self._llm_queue.get()
+            try:
+                await self._process_llm_task(task)
+            except Exception:  # noqa: BLE001 - LLM failure must not propagate
+                LOGGER.exception("llm_task_failed kind=%s", task.kind)
+            finally:
+                self._llm_queue.task_done()
+
+    async def _process_llm_task(self, task: _LLMTask) -> None:
+        """Handle one queued LLM job and publish its result to the snapshot."""
+
+        if task.kind == "enrich" and task.event is not None:
+            message = await self._llm_agent.enrich_event(task.event)
+            if message:
+                self._append_chat("agent", message, "llm")
+            return
+        if task.kind == "summary" and task.report is not None and task.events is not None:
+            summary = await self._llm_agent.generate_summary(task.report, task.events)
+            if summary is not None:
+                self._agent_summary = AgentSummaryPayload(
+                    title=summary.title,
+                    message=summary.message,
+                    highlights=summary.highlights,
+                    recommendation=summary.recommendation,
+                    event_count=summary.event_count,
+                    source="llm",
+                )
+                self._append_chat("agent", summary.message, "llm")
+
+    async def chat(self, message: str) -> str | None:
+        """Answer a patient/therapist question, or None when the LLM is off."""
+
+        if not self._llm_agent.chat_enabled:
+            return None
+        self._ensure_llm_worker()
+        self._append_chat("user", message, "user")
+        context: dict[str, Any] = {
+            "task": self._task_name,
+            "patient_profile": self._patient_profile,
+            "mode": self._mode,
+            "elapsed_s": round(self._elapsed_s, 2),
+            "task_progress": round(self._progress, 3),
+            "score": round(self._score, 3),
+        }
+        if self._report is not None:
+            context.update(self._report.model_dump())
+        elif self._telemetry is not None:
+            telemetry = self._telemetry
+            context.update(
+                {
+                    "tracking_error": round(float(np.linalg.norm(telemetry.tracking_error)), 4),
+                    "interaction_force": round(
+                        float(np.linalg.norm(telemetry.interaction_force[:2])), 4
+                    ),
+                    "human_power_w": round(telemetry.human_power_w, 4),
+                    "fatigue": round(telemetry.fatigue, 3),
+                    "safety_status": telemetry.safety_status,
+                }
+            )
+        history = [
+            {"role": item.role, "content": item.message}
+            for item in self._agent_chat[-10:]
+            if item.source in ("user", "llm")
+        ]
+        reply = await self._llm_agent.answer(message, context, history)
+        if reply is None:
+            LOGGER.warning("llm_chat_unavailable")
+            return None
+        self._append_chat("agent", reply, "llm")
+        return reply
 
     def snapshot(self) -> SessionSnapshot:
         """Build a serializable snapshot without exposing mutable internals."""
@@ -478,4 +616,5 @@ class TrainingSession:
                 else None
             ),
             agent_summary=self._agent_summary,
+            agent_chat=list(self._agent_chat),
         )

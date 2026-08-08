@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.schemas.models import ModeRequest, SessionSnapshot, StartRequest
+from backend.app.schemas.models import ChatRequest, ModeRequest, SessionSnapshot, StartRequest
 from backend.app.services.session import TrainingSession
 
 
@@ -81,6 +81,15 @@ def create_app() -> FastAPI:
         """Return all rule-based feedback events for audit/reporting."""
 
         return app.state.session.agent_events()
+
+    @app.post("/api/agent/chat")
+    async def agent_chat(request: ChatRequest) -> dict[str, str]:
+        """Ask the LLM interaction agent a patient/therapist question."""
+
+        reply = await app.state.session.chat(request.message)
+        if reply is None:
+            raise HTTPException(status_code=503, detail="LLM agent is not available")
+        return {"message": reply}
 
     @app.websocket("/ws/telemetry")
     async def telemetry(websocket: WebSocket) -> None:

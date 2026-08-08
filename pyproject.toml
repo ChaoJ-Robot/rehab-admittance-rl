@@ -16,6 +16,7 @@ dependencies = [
     "stable-baselines3>=2.3",
     "fastapi>=0.110",
     "uvicorn[standard]>=0.29",
+    "python-dotenv>=1.0",
     "matplotlib>=3.7",
     "imageio>=2.31",
     "imageio-ffmpeg>=0.4",
