@@ -578,7 +578,10 @@ class TrainingSession:
                 }
             )
         history = [
-            {"role": item.role, "content": item.message}
+            {
+                "role": "user" if item.role == "user" else "assistant",
+                "content": item.message,
+            }
             for item in self._agent_chat[-10:]
             if item.source in ("user", "llm")
         ]

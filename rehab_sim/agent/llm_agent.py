@@ -298,7 +298,13 @@ class LLMAgent:
         )
         messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_CHAT_PROMPT}]
         messages.extend(
-            {"role": str(item["role"]), "content": str(item["content"])}
+            {
+                # OpenAI-compatible APIs only accept system/user/assistant roles.
+                "role": (
+                    str(item["role"]) if str(item["role"]) in ("user", "system") else "assistant"
+                ),
+                "content": str(item["content"]),
+            }
             for item in history[-self.config.max_history_messages :]
         )
         messages.append(

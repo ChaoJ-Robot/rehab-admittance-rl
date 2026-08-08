@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 
 import httpx
@@ -180,3 +181,23 @@ def test_answer_falls_back_to_plain_text() -> None:
 def test_answer_disabled_returns_none() -> None:
     agent = LLMAgent(_config(chat_enabled=False), client=_client(""))
     assert asyncio.run(agent.answer("你好", {})) is None
+
+
+def test_answer_never_sends_invalid_history_roles() -> None:
+    """DeepSeek rejects roles other than system/user/assistant with a 400."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        roles = {message["role"] for message in body["messages"]}
+        if not roles <= {"system", "user", "assistant"}:
+            return httpx.Response(400, json={"error": "invalid role"})
+        return httpx.Response(
+            200, json={"choices": [{"message": {"content": "回答正常"}}]}
+        )
+
+    client = LLMClient(_config(), api_key="test-key", transport=httpx.MockTransport(handler))
+    agent = LLMAgent(_config(), client=client)
+    reply = asyncio.run(
+        agent.answer("问题", {}, history=[{"role": "agent", "content": "历史回复"}])
+    )
+    assert reply == "回答正常"
