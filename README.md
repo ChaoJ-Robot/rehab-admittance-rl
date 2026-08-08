@@ -91,12 +91,7 @@ flowchart TB
 装置为平面三自由度串联结构，任务空间 `[x, y, θ]`，人机交互力 `[Fx, Fy, Tz]`。CAD 模型经 STEP → URDF/MJCF 转换后导入 MuJoCo，三关节零位按 CAD 校正为三连杆共线。
 
 <p align="center">
-  <img src="docs/images/robot_view1.png" width="45%" alt="机器人 CAD 视图 1"/>
-  <img src="docs/images/robot_view2.png" width="45%" alt="机器人 CAD 视图 2"/>
-</p>
-
-<p align="center">
-  <img src="docs/images/mujoco_preview.png" width="60%" alt="MuJoCo 数字孪生预览"/>
+  <img src="docs/images/mujoco_preview.png" width="70%" alt="MuJoCo 数字孪生预览"/>
 </p>
 
 运动学与 MuJoCo 运行时接口：
@@ -190,8 +185,8 @@ python3 -m scripts.run_phase10_experiments
 训练完成后，LLM 自动生成个性化总结并写入聊天流，患者/治疗师可随时提问：
 
 <p align="center">
-  <img src="docs/images/ui_completed.png" width="95%" alt="训练完成后的界面"/>
-  <br/><em>训练完成：LLM 训练总结 + 智能教练对话</em>
+  <img src="docs/images/chat_flow.png" width="95%" alt="智能教练聊天流：规则反馈与 LLM 生成的训练总结"/>
+  <br/><em>智能教练聊天流：规则反馈 + LLM 生成的个性化训练总结</em>
 </p>
 
 ---
