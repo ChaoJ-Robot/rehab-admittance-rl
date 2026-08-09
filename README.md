@@ -179,7 +179,7 @@ python3 -m scripts.run_phase10_experiments
 
 前端采用**单页双视图布局**：首页（医生终端 / 患者终端）选择训练任务与参数，点击"开始训练"后进入训练页——**左侧 2/3 展示各数据模块，右侧 1/3 为智能教练聊天框**（≤1100px 窄屏自动切换单列滚动，保证全部图表可达）。
 
-任务库覆盖三大类五项训练：**轨迹跟踪**（点到点 / 圆轨迹 / 八字）、**空间导航**（迷宫导航）、**认知双任务**（色块记忆：记忆颜色序列并按顺序复述）。
+任务库覆盖五类九项训练：**轨迹跟踪**（点到点 / 圆轨迹 / 八字）、**空间导航**（迷宫导航）、**目标到达**（跟随到达 / 视觉引导到达）、**动态跟踪**（运动拦截）、**认知训练**（色块记忆 / 目标标记记忆）。
 
 <p align="center">
   <img src="screenshots/ui_home.png" width="95%" alt="首页：双栏医生工作台"/>
@@ -189,6 +189,11 @@ python3 -m scripts.run_phase10_experiments
 <p align="center">
   <img src="screenshots/ui_maze.png" width="95%" alt="迷宫导航训练页"/>
   <br/><em>迷宫导航训练页：迷宫可视化 · 交互力曲线 · 导纳参数（左 2/3）+ 智能教练（右 1/3）</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/ui_follow_reach.png" width="95%" alt="跟随到达训练页"/>
+  <br/><em>跟随到达训练页：按顺序跟随并到达多个目标点 · 轨迹与目标点可视化</em>
 </p>
 
 <p align="center">
