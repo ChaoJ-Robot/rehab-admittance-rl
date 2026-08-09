@@ -11,9 +11,10 @@ venv/
 
 # 内部文档与学习资料（不公开）
 *.docx
-docs/新手学习手册.md
-docs/phase10_project_report.md
-docs/resume_description.md
+docs/
+
+# 患者档案数据（个人健康数据，不公开）
+data/
 
 build/
 install/

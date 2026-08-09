@@ -1,5 +1,11 @@
 """Phase 8 interaction-agent interfaces."""
 
+from rehab_sim.agent.clinical import (
+    SessionPrescription,
+    TrendAssessment,
+    assess_history,
+    recommend_next_session,
+)
 from rehab_sim.agent.llm_agent import (
     LLMAgent,
     LLMClient,
@@ -22,6 +28,10 @@ __all__ = [
     "LLMClient",
     "LLMConfig",
     "RuleBasedAgent",
+    "SessionPrescription",
+    "TrendAssessment",
+    "assess_history",
     "load_agent_config",
     "load_llm_config",
+    "recommend_next_session",
 ]

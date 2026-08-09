@@ -1,4 +1,9 @@
-schema_version: 1
+schema_version: 2
+
+# Each task declares its default parameters plus an `adjustable` list that
+# drives the therapist-side controls (sliders / select boxes). The frontend
+# sends chosen values back through StartRequest.task_params; the backend
+# merges them over these defaults per session.
 
 tasks:
   point_to_point:
@@ -6,20 +11,372 @@ tasks:
     target_radius: 0.025        # m
     reference_speed: 0.05       # m/s
     task_duration: 4.0          # s
+    adjustable:
+      - name: target_distance
+        label: 目标距离
+        min: 0.05
+        max: 0.30
+        step: 0.01
+        default: 0.15
+        unit: m
+      - name: reference_speed
+        label: 参考速度
+        min: 0.02
+        max: 0.12
+        step: 0.01
+        default: 0.05
+        unit: m/s
+      - name: task_duration
+        label: 训练时长
+        min: 2
+        max: 60
+        step: 1
+        default: 4
+        unit: s
   circle_tracking:
     path_radius: 0.08           # m, simulation placeholder
     reference_speed: 0.10       # m/s
     path_width: 0.025           # m
     task_duration: 8.0          # s
+    adjustable:
+      - name: path_radius
+        label: 路径半径
+        min: 0.04
+        max: 0.18
+        step: 0.01
+        default: 0.08
+        unit: m
+      - name: reference_speed
+        label: 参考速度
+        min: 0.04
+        max: 0.20
+        step: 0.01
+        default: 0.10
+        unit: m/s
+      - name: task_duration
+        label: 训练时长
+        min: 4
+        max: 120
+        step: 2
+        default: 8
+        unit: s
   figure8_tracking:
     path_width: 0.12            # m, simulation placeholder
     reference_speed: 0.10       # m/s
     path_width_tolerance: 0.03  # m
     task_duration: 8.0          # s
+    adjustable:
+      - name: path_width
+        label: 路径宽度
+        min: 0.06
+        max: 0.24
+        step: 0.02
+        default: 0.12
+        unit: m
+      - name: reference_speed
+        label: 参考速度
+        min: 0.04
+        max: 0.20
+        step: 0.01
+        default: 0.10
+        unit: m/s
+      - name: task_duration
+        label: 训练时长
+        min: 4
+        max: 120
+        step: 2
+        default: 8
+        unit: s
   maze_navigation:
     reference_speed: 0.14       # m/s along the maze corridor path
-    task_duration: 8.0          # s
+    task_duration: 30.0         # s; complex generated mazes need a larger dose window
+    default_map: s_shape
+    # Map design rules (enforced by tests/unit/test_maze_maps.py):
+    # every waypoint route (robot start 0.35,0 -> wp1 -> ... -> wpN) must not
+    # cross any wall; corridors keep >= 0.05 m clearance from the outer frame.
+    maps:
+      s_shape:
+        label: S 形挡板 · 入门
+        walls:
+          - [0.15, -0.22, 0.60, -0.22]
+          - [0.15, 0.22, 0.60, 0.22]
+          - [0.15, -0.22, 0.15, 0.22]
+          - [0.60, -0.22, 0.60, 0.22]
+          - [0.26, -0.22, 0.26, 0.06]
+          - [0.44, -0.06, 0.44, 0.22]
+          - [0.53, -0.22, 0.53, 0.06]
+          - [0.20, -0.22, 0.20, 0.02]
+        waypoints:
+          - [0.35, -0.15, 0.0]
+          - [0.485, -0.15, 0.0]
+          - [0.485, 0.15, 0.0]
+          - [0.565, 0.15, 0.0]
+          - [0.565, -0.15, 0.0]
+      spiral:
+        label: 回形围环 · 入门
+        walls:
+          - [0.15, -0.22, 0.60, -0.22]
+          - [0.15, 0.22, 0.60, 0.22]
+          - [0.15, -0.22, 0.15, 0.22]
+          - [0.60, -0.22, 0.60, 0.22]
+          - [0.24, -0.12, 0.50, -0.12]
+          - [0.24, 0.12, 0.50, 0.12]
+          - [0.24, -0.12, 0.24, 0.12]
+          - [0.50, -0.12, 0.50, -0.02]
+          - [0.50, 0.02, 0.50, 0.12]
+        waypoints:
+          - [0.53, 0.0, 0.0]
+          - [0.53, -0.17, 0.0]
+          - [0.21, -0.17, 0.0]
+          - [0.21, 0.17, 0.0]
+          - [0.45, 0.17, 0.0]
+      ladder:
+        label: 挡板蛇行 · 进阶
+        walls:
+          - [0.15, -0.22, 0.60, -0.22]
+          - [0.15, 0.22, 0.60, 0.22]
+          - [0.15, -0.22, 0.15, 0.22]
+          - [0.60, -0.22, 0.60, 0.22]
+          - [0.24, -0.22, 0.24, 0.06]
+          - [0.36, -0.06, 0.36, 0.22]
+          - [0.48, -0.22, 0.48, 0.06]
+          - [0.195, -0.22, 0.195, 0.02]
+          - [0.15, 0.12, 0.20, 0.12]
+        waypoints:
+          - [0.35, -0.15, 0.0]
+          - [0.42, -0.15, 0.0]
+          - [0.42, 0.15, 0.0]
+          - [0.54, 0.15, 0.0]
+          - [0.54, -0.15, 0.0]
+      serpent:
+        label: 五栅长蛇 · 进阶
+        walls:
+          - [0.15, -0.22, 0.60, -0.22]
+          - [0.15, 0.22, 0.60, 0.22]
+          - [0.15, -0.22, 0.15, 0.22]
+          - [0.60, -0.22, 0.60, 0.22]
+          - [0.22, -0.22, 0.22, 0.05]
+          - [0.30, -0.05, 0.30, 0.22]
+          - [0.40, -0.05, 0.40, 0.22]
+          - [0.48, -0.22, 0.48, 0.05]
+          - [0.56, -0.05, 0.56, 0.22]
+          - [0.26, -0.22, 0.26, -0.10]
+        waypoints:
+          - [0.35, -0.15, 0.0]
+          - [0.44, -0.15, 0.0]
+          - [0.44, 0.15, 0.0]
+          - [0.52, 0.15, 0.0]
+          - [0.52, -0.15, 0.0]
+          - [0.58, -0.15, 0.0]
+          - [0.58, 0.15, 0.0]
+      chambers:
+        label: 四室环路 · 挑战
+        walls:
+          - [0.15, -0.22, 0.60, -0.22]
+          - [0.15, 0.22, 0.60, 0.22]
+          - [0.15, -0.22, 0.15, 0.22]
+          - [0.60, -0.22, 0.60, 0.22]
+          - [0.375, -0.22, 0.375, -0.10]
+          - [0.375, -0.02, 0.375, 0.10]
+          - [0.375, 0.18, 0.375, 0.22]
+          - [0.15, 0.02, 0.28, 0.02]
+          - [0.34, 0.02, 0.48, 0.02]
+          - [0.54, 0.02, 0.60, 0.02]
+        waypoints:
+          - [0.35, -0.06, 0.0]
+          - [0.51, -0.06, 0.0]
+          - [0.51, 0.14, 0.0]
+          - [0.30, 0.14, 0.0]
+          - [0.30, -0.06, 0.0]
+          - [0.22, -0.06, 0.0]
+      bastion:
+        label: 堡垒要塞 · 挑战
+        walls:
+          - [0.15, -0.22, 0.60, -0.22]
+          - [0.15, 0.22, 0.60, 0.22]
+          - [0.15, -0.22, 0.15, 0.22]
+          - [0.60, -0.22, 0.60, 0.22]
+          - [0.24, -0.22, 0.24, 0.05]
+          - [0.33, -0.05, 0.33, 0.22]
+          - [0.44, -0.05, 0.44, 0.22]
+          - [0.53, -0.22, 0.53, 0.05]
+          - [0.39, 0.22, 0.39, 0.12]
+          - [0.285, -0.22, 0.285, -0.12]
+          - [0.195, 0.22, 0.195, 0.12]
+          - [0.15, -0.10, 0.20, -0.10]
+        waypoints:
+          - [0.40, -0.04, 0.0]
+          - [0.40, -0.15, 0.0]
+          - [0.485, -0.15, 0.0]
+          - [0.485, 0.15, 0.0]
+          - [0.565, 0.15, 0.0]
+          - [0.565, -0.15, 0.0]
+    adjustable:
+      - name: map
+        type: select
+        label: 地图样式
+        options: [s_shape, spiral, ladder, serpent, chambers, bastion, procedural_easy, procedural_medium, procedural_challenge]
+        default: s_shape
+        labels:
+          s_shape: S 形挡板 · 入门
+          spiral: 回形围环 · 入门
+          ladder: 挡板蛇行 · 进阶
+          serpent: 五栅长蛇 · 进阶
+          chambers: 四室环路 · 挑战
+          bastion: 堡垒要塞 · 挑战
+          procedural_easy: 随机网格 · 入门
+          procedural_medium: 随机网格 · 进阶
+          procedural_challenge: 随机网格 · 挑战
+      - name: maze_seed
+        label: 地图编号
+        min: 1
+        max: 99
+        step: 1
+        default: 1
+      - name: reference_speed
+        label: 参考速度
+        min: 0.06
+        max: 0.24
+        step: 0.02
+        default: 0.14
+        unit: m/s
+      - name: task_duration
+        label: 训练时长
+        min: 4
+        max: 120
+        step: 2
+        default: 30
+        unit: s
   color_memory:
     sequence_length: 4          # number of colour blocks to memorise
     memorize_duration: 3.0      # s of the memorise phase
     task_duration: 10.0         # s
+    adjustable:
+      - name: sequence_length
+        label: 序列长度
+        type: select
+        options: [2, 3, 4, 5, 6]
+        default: 4
+      - name: memorize_duration
+        label: 记忆时长
+        min: 1.0
+        max: 8.0
+        step: 0.5
+        default: 3.0
+        unit: s
+      - name: task_duration
+        label: 训练时长
+        min: 5
+        max: 120
+        step: 2
+        default: 10
+        unit: s
+  follow_to_reach:
+    target_count: 4             # number of targets to visit in sequence
+    reference_speed: 0.12       # m/s between targets
+    target_radius: 0.03         # m, success tolerance around each target
+    dwell_time: 0.5             # s the reference holds on each target
+    task_duration: 12.0         # s
+    adjustable:
+      - name: target_count
+        label: 目标数量
+        type: select
+        options: [2, 3, 4, 5, 6]
+        default: 4
+      - name: reference_speed
+        label: 参考速度
+        min: 0.04
+        max: 0.24
+        step: 0.02
+        default: 0.12
+        unit: m/s
+      - name: task_duration
+        label: 训练时长
+        min: 6
+        max: 180
+        step: 2
+        default: 12
+        unit: s
+  visual_guided_reach:
+    target_count: 4             # targets reached one at a time
+    reference_speed: 0.12       # m/s toward the visible target
+    target_radius: 0.03         # m, positioning tolerance (difficulty)
+    dwell_time: 0.3             # s hold after arrival before next target
+    task_duration: 12.0         # s
+    adjustable:
+      - name: target_count
+        label: 目标数量
+        type: select
+        options: [2, 3, 4, 5, 6]
+        default: 4
+      - name: target_radius
+        label: 到达容差
+        min: 0.015
+        max: 0.05
+        step: 0.005
+        default: 0.03
+        unit: m
+      - name: reference_speed
+        label: 参考速度
+        min: 0.04
+        max: 0.24
+        step: 0.02
+        default: 0.12
+        unit: m/s
+      - name: task_duration
+        label: 训练时长
+        min: 6
+        max: 180
+        step: 2
+        default: 12
+        unit: s
+  motion_intercept:
+    reference_speed: 0.08       # m/s, speed of the shuttling target
+    path_length: 0.18           # m, interception corridor length
+    task_duration: 10.0         # s
+    adjustable:
+      - name: reference_speed
+        label: 目标移动速度
+        min: 0.03
+        max: 0.15
+        step: 0.01
+        default: 0.08
+        unit: m/s
+      - name: path_length
+        label: 拦截走廊长度
+        min: 0.10
+        max: 0.30
+        step: 0.02
+        default: 0.18
+        unit: m
+      - name: task_duration
+        label: 训练时长
+        min: 4
+        max: 120
+        step: 2
+        default: 10
+        unit: s
+  marker_memory:
+    marker_count: 3             # spatial memory rounds
+    memorize_duration: 3.0      # s the marker stays visible each round
+    task_duration: 12.0         # s
+    adjustable:
+      - name: marker_count
+        label: 标记轮数
+        type: select
+        options: [2, 3, 4, 5]
+        default: 3
+      - name: memorize_duration
+        label: 记忆时长
+        min: 1.0
+        max: 8.0
+        step: 0.5
+        default: 3.0
+        unit: s
+      - name: task_duration
+        label: 训练时长
+        min: 6
+        max: 180
+        step: 2
+        default: 12
+        unit: s

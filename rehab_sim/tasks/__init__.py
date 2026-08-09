@@ -1,5 +1,6 @@
 """Reference trajectories used by the Phase 4 environments."""
 
+from rehab_sim.tasks.maze import MazeLayout, generate_grid_maze
 from rehab_sim.tasks.trajectories import (
     CircleTrajectory,
     FigureEightTrajectory,
@@ -12,4 +13,6 @@ __all__ = [
     "FigureEightTrajectory",
     "PointToPointTrajectory",
     "ReferenceTrajectory",
+    "MazeLayout",
+    "generate_grid_maze",
 ]

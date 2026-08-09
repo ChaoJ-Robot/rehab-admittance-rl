@@ -2,17 +2,21 @@ import type { Telemetry } from "../types";
 
 interface TrajectoryChartProps {
   points: Telemetry[];
+  targets?: number[][];
 }
 
-export function TrajectoryChart({ points }: TrajectoryChartProps) {
+export function TrajectoryChart({ points, targets = [] }: TrajectoryChartProps) {
   const width = 620;
   const height = 260;
-  const coordinates = points.flatMap((point) => [
-    [point.reference_pose[0], point.reference_pose[1]],
-    [point.actual_pose[0], point.actual_pose[1]]
-  ]);
-  const xs = coordinates.map(([x]) => x);
-  const ys = coordinates.map(([, y]) => y);
+  const coordinatePoints = [
+    ...points.flatMap((point) => [
+      [point.reference_pose[0], point.reference_pose[1]],
+      [point.actual_pose[0], point.actual_pose[1]]
+    ]),
+    ...targets.map(([x, y]) => [x, y])
+  ];
+  const xs = coordinatePoints.map(([x]) => x as number);
+  const ys = coordinatePoints.map(([, y]) => y as number);
   const minX = xs.length ? Math.min(...xs) : 0;
   const maxX = xs.length ? Math.max(...xs) : 1;
   const minY = ys.length ? Math.min(...ys) : -0.1;
@@ -34,6 +38,15 @@ export function TrajectoryChart({ points }: TrajectoryChartProps) {
           <line x1={width * ratio} x2={width * ratio} y1="0" y2={height} className="trajectory-grid" />
           <line x1="0" x2={width} y1={height * ratio} y2={height * ratio} className="trajectory-grid" />
         </g>)}
+        {targets.map((target, index) => {
+          const [cx, cy] = project(target[0], target[1]);
+          return (
+            <g key={index}>
+              <circle cx={cx} cy={cy} r="9" className="task-target-ring" />
+              <text x={cx} y={cy + 3} textAnchor="middle" className="task-target-label">{index + 1}</text>
+            </g>
+          );
+        })}
         <polyline points={path("reference_pose")} className="reference-path" />
         <polyline points={path("actual_pose")} className="actual-path" />
         {points.length > 0 && <circle cx={project(points[points.length - 1].actual_pose[0], points[points.length - 1].actual_pose[1])[0]} cy={project(points[points.length - 1].actual_pose[0], points[points.length - 1].actual_pose[1])[1]} r="5" className="trajectory-endpoint" />}
@@ -42,6 +55,7 @@ export function TrajectoryChart({ points }: TrajectoryChartProps) {
       <div className="chart-legend">
         <span><i className="legend-reference" />参考轨迹</span>
         <span><i className="legend-actual" />实际轨迹</span>
+        {targets.length > 0 && <span><i className="legend-target" />到达目标点</span>}
       </div>
     </div>
   );

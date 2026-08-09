@@ -212,12 +212,38 @@ class RuleBasedAgent:
                 LOGGER.exception("agent_speech_failed")
         return result
 
-    def start(self, task: str, patient_profile: str = "moderate") -> AgentEvent | None:
+    def start(
+        self,
+        task: str,
+        patient_profile: str = "moderate",
+        check_in: Mapping[str, Any] | None = None,
+    ) -> AgentEvent | None:
         """Emit the start prompt for a new session."""
 
         self.reset()
         self._task = task
         self._started = True
+        readiness = check_in or {}
+        pain = float(readiness.get("pain_vas", 0.0))
+        fatigue = float(readiness.get("fatigue_0_10", 0.0))
+        if pain >= 7.0:
+            observation = AgentObservation(task, 0.0, 0.0, 0.0, 0.0, 0.0, fatigue / 10, 0.0, "safe")
+            return self._emit(
+                "pre_session_pain_high",
+                f"训练前疼痛为 {pain:.0f}/10，建议暂停并由治疗师复核后再开始。",
+                observation,
+                "critical",
+                force=True,
+            )
+        if pain >= 4.0 or fatigue >= 6.0:
+            observation = AgentObservation(task, 0.0, 0.0, 0.0, 0.0, 0.0, fatigue / 10, 0.0, "safe")
+            return self._emit(
+                "pre_session_readiness_warning",
+                f"训练前疼痛 {pain:.0f}/10、疲劳 {fatigue:.0f}/10，建议降低剂量并加强观察。",
+                observation,
+                "warning",
+                force=True,
+            )
         return self._emit(
             "task_started",
             f"本次{task}训练开始，请保持自然、主动的动作。",

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -12,25 +12,106 @@ TaskName = Literal[
     "figure8_tracking",
     "maze_navigation",
     "color_memory",
+    "follow_to_reach",
+    "visual_guided_reach",
+    "motion_intercept",
+    "marker_memory",
 ]
 PatientProfile = Literal["mild", "moderate", "severe"]
 ControlMode = Literal["fixed", "rl"]
 SessionState = Literal["idle", "running", "paused", "completed", "stopped"]
+AffectedSide = Literal["left", "right", "bilateral", "unknown"]
+RehabStage = Literal["acute", "subacute", "chronic", "unknown"]
+
+
+class PatientClinicalProfilePayload(BaseModel):
+    """Clinically relevant context used by the therapist and decision support layer."""
+
+    diagnosis: str = Field(default="", max_length=120)
+    affected_side: AffectedSide = "unknown"
+    dominant_side: Literal["left", "right", "unknown"] = "unknown"
+    onset_date: str = Field(default="", max_length=10)
+    rehab_stage: RehabStage = "unknown"
+    goals: list[str] = Field(default_factory=list)
+    precautions: list[str] = Field(default_factory=list)
+    standardized_scores: dict[str, float] = Field(default_factory=dict)
+    notes: str = Field(default="", max_length=1000)
+
+
+class TrainingCheckInPayload(BaseModel):
+    """Patient-reported readiness immediately before one training session."""
+
+    pain_vas: float = Field(default=0.0, ge=0.0, le=10.0)
+    fatigue_0_10: float = Field(default=0.0, ge=0.0, le=10.0)
+    exertion_rpe: float = Field(default=0.0, ge=0.0, le=10.0)
+    note: str = Field(default="", max_length=300)
+
+
+class TaskParamSpec(BaseModel):
+    """One adjustable task parameter exposed to the therapist page."""
+
+    name: str
+    label: str
+    type: Literal["slider", "select"] = "slider"
+    min: float | None = None
+    max: float | None = None
+    step: float | None = None
+    default: float | str | None = None
+    options: list[float | str] = Field(default_factory=list)
+    labels: dict[str, str] = Field(default_factory=dict)
+    unit: str = ""
 
 
 class StartRequest(BaseModel):
     """Configuration for a simulation-only training session."""
 
     task: TaskName = "point_to_point"
-    patient_profile: PatientProfile = "moderate"
+    patient_id: str = "default"
+    patient_profile: PatientProfile | None = None
     mode: ControlMode = "fixed"
     duration_s: float | None = Field(default=None, gt=0.0, le=600.0)
+    task_params: dict[str, Any] = Field(default_factory=dict)
+    assignment_id: str | None = None
+    check_in: TrainingCheckInPayload = Field(default_factory=TrainingCheckInPayload)
+
+
+class AssignmentRequest(BaseModel):
+    """One training task dispatched to a patient by the therapist."""
+
+    task: TaskName
+    task_params: dict[str, Any] = Field(default_factory=dict)
+    due_date: str = ""
+
+
+class AssignmentPayload(BaseModel):
+    """Persisted state of a dispatched training task."""
+
+    assignment_id: str
+    task: TaskName
+    task_params: dict[str, Any] = Field(default_factory=dict)
+    due_date: str = ""
+    status: Literal["pending", "completed"] = "pending"
+    assigned_at: float
+    completed_at: float | None = None
+    completed_session: str | None = None
 
 
 class ModeRequest(BaseModel):
     """Requested controller mode."""
 
     mode: ControlMode
+
+
+class PatientRequest(BaseModel):
+    """Profile selection when registering or updating a patient."""
+
+    profile: PatientProfile
+
+
+class PatientClinicalProfileRequest(BaseModel):
+    """Create or replace the clinical context attached to a patient record."""
+
+    clinical_profile: PatientClinicalProfilePayload
 
 
 class AgentEventPayload(BaseModel):
@@ -85,6 +166,8 @@ class Telemetry(BaseModel):
     interaction_force: list[float]
     human_power_w: float
     fatigue: float
+    active_participation_ratio: float = 0.0
+    robot_assistance_ratio: float = 0.0
     admittance_parameters: list[float]
     rl_action: list[float]
     task_progress: float
@@ -93,10 +176,18 @@ class Telemetry(BaseModel):
     safety_reasons: list[str]
     agent_event: AgentEventPayload | None = None
     maze_walls: list[list[float]] = Field(default_factory=list)
+    maze_start: list[float] = Field(default_factory=list)
+    maze_goal: list[float] = Field(default_factory=list)
+    maze_optimal_path: list[list[float]] = Field(default_factory=list)
+    maze_collision_count: int = 0
+    maze_path_efficiency: float | None = None
+    task_success: bool = False
+    memory_marker: list[float] = Field(default_factory=list)
     color_block_positions: list[list[float]] = Field(default_factory=list)
     color_block_names: list[str] = Field(default_factory=list)
     color_sequence: list[str] = Field(default_factory=list)
     task_phase: Literal["memorize", "recall"] | None = None
+    task_targets: list[list[float]] = Field(default_factory=list)
 
 
 class TrainingReport(BaseModel):
@@ -114,6 +205,83 @@ class TrainingReport(BaseModel):
     parameter_change_total: float
     safety_trigger_count: int
     final_score: float
+    active_participation_ratio: float = 0.0
+    robot_assistance_ratio: float = 0.0
+    path_efficiency: float | None = None
+    collision_count: int = 0
+    target_hit_count: int = 0
+
+
+class PatientHistoryEntryPayload(BaseModel):
+    """One past training session shown on the therapist page."""
+
+    session_id: str
+    task: TaskName
+    timestamp: float
+    duration_s: float
+    score: float
+    completion_rate: float
+    average_tracking_error: float
+    final_parameters: list[float] = Field(default_factory=list)
+    mode: ControlMode = "fixed"
+    task_params: dict[str, Any] = Field(default_factory=dict)
+    check_in: TrainingCheckInPayload = Field(default_factory=TrainingCheckInPayload)
+    peak_interaction_force: float = 0.0
+    active_participation_ratio: float = 0.0
+    robot_assistance_ratio: float = 0.0
+    safety_trigger_count: int = 0
+    path_efficiency: float | None = None
+    collision_count: int = 0
+    target_hit_count: int = 0
+
+
+class PatientSummary(BaseModel):
+    """A patient's profile and cross-session state."""
+
+    patient_id: str
+    profile: PatientProfile
+    created_at: float
+    last_session_at: float | None = None
+    session_count: int = 0
+    latest_parameters: list[float] = Field(default_factory=list)
+    history: list[PatientHistoryEntryPayload] = Field(default_factory=list)
+    clinical_profile: PatientClinicalProfilePayload = Field(
+        default_factory=PatientClinicalProfilePayload
+    )
+
+
+class PatientAssessmentPayload(BaseModel):
+    """Longitudinal trend assessment produced by the clinical agent layer."""
+
+    patient_id: str
+    sessions_analyzed: int
+    classification: Literal["improving", "plateau", "regressing", "insufficient_data"]
+    score_slope: float
+    completion_slope: float
+    error_slope: float
+    avg_score_recent: float | None = None
+    avg_completion_recent: float | None = None
+    avg_error_recent: float | None = None
+    flags: list[str] = Field(default_factory=list)
+    narrative: str = ""
+    risk_level: Literal["low", "moderate", "high"] = "low"
+    evidence: list[str] = Field(default_factory=list)
+
+
+class SessionPrescriptionPayload(BaseModel):
+    """Agent suggestion for the patient's next training session."""
+
+    patient_id: str
+    task: TaskName
+    task_params: dict[str, Any] = Field(default_factory=dict)
+    mode: ControlMode
+    difficulty_action: Literal["upgrade", "maintain", "downgrade", "baseline"]
+    rationale: list[str] = Field(default_factory=list)
+    risk_level: Literal["low", "moderate", "high"] = "low"
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    missing_data: list[str] = Field(default_factory=list)
+    precautions: list[str] = Field(default_factory=list)
+    requires_doctor_approval: bool = True
 
 
 class SessionSnapshot(BaseModel):
@@ -122,6 +290,7 @@ class SessionSnapshot(BaseModel):
     session_id: str
     state: SessionState
     task: TaskName
+    patient_id: str
     patient_profile: PatientProfile
     mode: ControlMode
     elapsed_s: float
@@ -139,6 +308,7 @@ class ConfigSummary(BaseModel):
     """Configuration choices exposed to the therapist page."""
 
     tasks: list[TaskName]
+    task_params: dict[str, list[TaskParamSpec]] = Field(default_factory=dict)
     patient_profiles: list[PatientProfile]
     modes: list[ControlMode]
     refresh_hz: int
