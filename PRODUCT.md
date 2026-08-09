@@ -42,7 +42,7 @@ web
 
 ## Evidence on Hand
 
-- 项目文档：PROJECT_SPEC.md、upper_limb_rehab_safe_rl_project_spec.md、docs/phase10_project_report.md（含实验图表）。
+- 项目文档：PROJECT_SPEC.md、upper_limb_rehab_safe_rl_project_spec.md（内部报告 docs/phase10_project_report.md 含实验图表，不随仓库推送）。
 - 实验结果：experiments/reports/ 下的基线、患者仿真与 Phase 10 实验报告。
 - 北航 logo：frontend/public/buaa-logo.png（官网下载，白色版，316×68 PNG）。
 
