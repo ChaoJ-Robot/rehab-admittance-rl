@@ -182,18 +182,18 @@ python3 -m scripts.run_phase10_experiments
 任务库覆盖三大类五项训练：**轨迹跟踪**（点到点 / 圆轨迹 / 八字）、**空间导航**（迷宫导航）、**认知双任务**（色块记忆：记忆颜色序列并按顺序复述）。
 
 <p align="center">
-  <img src="docs/images/ui_home.png" width="95%" alt="首页：任务库选择"/>
+  <img src="docs/images/封面.png" width="95%" alt="首页：任务库选择"/>
   <br/><em>首页：任务库选择 · 患者配置 · 控制模式</em>
 </p>
 
 <p align="center">
-  <img src="docs/images/ui_maze.png" width="95%" alt="迷宫导航训练页"/>
+  <img src="docs/images/迷宫导航任务截图.png" width="95%" alt="迷宫导航训练页"/>
   <br/><em>迷宫导航训练页：迷宫可视化 · 交互力曲线 · 导纳参数（左 2/3）+ 智能教练（右 1/3）</em>
 </p>
 
 <p align="center">
-  <img src="docs/images/ui_color.png" width="95%" alt="色块记忆训练页"/>
-  <br/><em>色块记忆训练页：记忆/复述阶段 · 颜色序列 · 四色块工作区</em>
+  <img src="docs/images/跟随到达任务.png" width="95%" alt="跟随到达任务训练页"/>
+  <br/><em>跟随到达任务训练页：记忆/复述阶段 · 颜色序列 · 四色块工作区</em>
 </p>
 
 训练结束后，LLM 自动生成个性化总结并写入聊天流，患者/治疗师可随时提问：
