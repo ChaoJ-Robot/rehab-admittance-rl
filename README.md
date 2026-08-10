@@ -91,7 +91,7 @@ flowchart TB
 装置为平面三自由度串联结构，任务空间 `[x, y, θ]`，人机交互力 `[Fx, Fy, Tz]`。CAD 模型经 STEP → URDF/MJCF 转换后导入 MuJoCo，三关节零位按 CAD 校正为三连杆共线。
 
 <p align="center">
-  <img src="docs/images/mujoco_preview.png" width="70%" alt="MuJoCo 数字孪生预览"/>
+  <img src="screenshots/mujoco_preview.png" width="70%" alt="MuJoCo 数字孪生 预览"/>
 </p>
 
 运动学与 MuJoCo 运行时接口：
@@ -153,17 +153,17 @@ flowchart TB
 > **关于成功率**：五种方法均实现 100% 安全完成率——这是康复系统所有方法必须满足的安全底线。方法间的核心差异体现在质量指标上：**SAC 跟踪误差最低**（轻度 0.0129 vs 固定导纳 0.0132）且峰值交互力更低；**重度患者下模糊控制的患者主动参与度降至 0.62**（过度辅助压制了患者主动性），而 SAC/规则自适应保持在 0.83/0.87，验证了自适应辅助的价值；固定导纳参数振荡率为 0（不调参），SAC 主动调参（振荡率 0.63–0.66）但换来更优的跟踪与更低的交互力。
 
 <p align="center">
-  <img src="docs/images/exp_success_rate.png" width="90%" alt="成功率对比"/>
+  <img src="screenshots/exp_success_rate.png" width="90%" alt="成功率对比"/>
   <br/><em>五方法 × 三类患者 成功率对比</em>
 </p>
 
 <p align="center">
-  <img src="docs/images/exp_tracking_force.png" width="90%" alt="跟踪与交互力对比"/>
+  <img src="screenshots/exp_tracking_force.png" width="90%" alt="跟踪与交互力对比"/>
   <br/><em>跟踪误差与交互力对比</em>
 </p>
 
 <p align="center">
-  <img src="docs/images/exp_parameter_stability.png" width="90%" alt="参数稳定性"/>
+  <img src="screenshots/exp_parameter_stability.png" width="90%" alt="参数稳定性"/>
   <br/><em>导纳参数稳定性 / 振荡率</em>
 </p>
 
@@ -177,29 +177,34 @@ python3 -m scripts.run_phase10_experiments
 
 ## 七、实时交互界面
 
-前端采用**单页无滚动布局**：首页选择训练任务与参数，点击"开始训练"后进入训练页——**左侧 2/3 展示各数据模块，右侧 1/3 为智能教练聊天框**。
+前端采用**单页双视图布局**：首页（医生终端 / 患者终端）选择训练任务与参数，点击"开始训练"后进入训练页——**左侧 2/3 展示各数据模块，右侧 1/3 为智能教练聊天框**（≤1100px 窄屏自动切换单列滚动，保证全部图表可达）。
 
-任务库覆盖三大类五项训练：**轨迹跟踪**（点到点 / 圆轨迹 / 八字）、**空间导航**（迷宫导航）、**认知双任务**（色块记忆：记忆颜色序列并按顺序复述）。
+任务库覆盖五类九项训练：**轨迹跟踪**（点到点 / 圆轨迹 / 八字）、**空间导航**（迷宫导航）、**目标到达**（跟随到达 / 视觉引导到达）、**动态跟踪**（运动拦截）、**认知训练**（色块记忆 / 目标标记记忆）。
 
 <p align="center">
-  <img src="docs/images/封面.png" width="95%" alt="首页：任务库选择"/>
-  <br/><em>首页：任务库选择 · 患者配置 · 控制模式</em>
+  <img src="screenshots/ui_home.png" width="95%" alt="首页：双栏医生工作台"/>
+  <br/><em>首页：双栏医生工作台 · 任务库 · 患者档案 · 训练方案</em>
 </p>
 
 <p align="center">
-  <img src="docs/images/迷宫导航任务截图.png" width="95%" alt="迷宫导航训练页"/>
+  <img src="screenshots/ui_maze.png" width="95%" alt="迷宫导航训练页"/>
   <br/><em>迷宫导航训练页：迷宫可视化 · 交互力曲线 · 导纳参数（左 2/3）+ 智能教练（右 1/3）</em>
 </p>
 
 <p align="center">
-  <img src="docs/images/跟随到达任务.png" width="95%" alt="跟随到达任务训练页"/>
-  <br/><em>跟随到达任务训练页：记忆/复述阶段 · 颜色序列 · 四色块工作区</em>
+  <img src="screenshots/ui_follow_reach.png" width="95%" alt="跟随到达训练页"/>
+  <br/><em>跟随到达训练页：按顺序跟随并到达多个目标点 · 轨迹与目标点可视化</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/ui_color.png" width="95%" alt="色块记忆训练页"/>
+  <br/><em>色块记忆训练页：记忆/复述阶段 · 颜色序列 · 四色块工作区</em>
 </p>
 
 训练结束后，LLM 自动生成个性化总结并写入聊天流，患者/治疗师可随时提问：
 
 <p align="center">
-  <img src="docs/images/chat_flow.png" width="95%" alt="智能教练聊天流：规则反馈与 LLM 生成的训练总结"/>
+  <img src="screenshots/chat_flow.png" width="95%" alt="智能教练聊天流：规则反馈与 LLM 生成的训练总结"/>
   <br/><em>智能教练聊天流：规则反馈 + LLM 生成的个性化训练总结</em>
 </p>
 
@@ -227,7 +232,8 @@ rl_admittance_rehab_ws/
 ├── scripts/                  # 训练/评估/实验一键脚本
 ├── experiments/              # 实验数据、模型与报告
 ├── tests/                    # unit / integration / regression
-└── docs/                     # 报告、简历描述、学习手册、图片
+├── screenshots/              # README 界面与实验截图（公开）
+└── docs/                     # 内部文档与学习资料（不推送）
 ```
 
 ---
