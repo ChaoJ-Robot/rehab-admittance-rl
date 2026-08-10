@@ -196,18 +196,6 @@ python3 -m scripts.run_phase10_experiments
   <br/><em>跟随到达训练页：按顺序跟随并到达多个目标点 · 轨迹与目标点可视化</em>
 </p>
 
-<p align="center">
-  <img src="screenshots/ui_color.png" width="95%" alt="色块记忆训练页"/>
-  <br/><em>色块记忆训练页：记忆/复述阶段 · 颜色序列 · 四色块工作区</em>
-</p>
-
-训练结束后，LLM 自动生成个性化总结并写入聊天流，患者/治疗师可随时提问：
-
-<p align="center">
-  <img src="screenshots/chat_flow.png" width="95%" alt="智能教练聊天流：规则反馈与 LLM 生成的训练总结"/>
-  <br/><em>智能教练聊天流：规则反馈 + LLM 生成的个性化训练总结</em>
-</p>
-
 ---
 
 ## 八、项目结构
